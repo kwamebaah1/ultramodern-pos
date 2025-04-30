@@ -1,4 +1,3 @@
-// src/components/ui/Input.js
 'use client';
 
 import { forwardRef } from 'react';
