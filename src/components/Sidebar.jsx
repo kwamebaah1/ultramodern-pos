@@ -14,7 +14,7 @@ const navItems = [
   { name: 'POS', href: '/pos', icon: FiShoppingCart },
   { name: 'Analytics', href: '/analytics', icon: FiPieChart },
   { name: 'Customers', href: '/customers', icon: FiUsers },
-  { name: 'Inventory', href: '/inventory', icon: FiPieChart },
+  { name: 'Inventory', href: '/products', icon: FiPieChart },
   { name: 'Settings', href: '/settings', icon: FiSettings },
 ];
 
