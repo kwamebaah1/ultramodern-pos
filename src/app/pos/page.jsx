@@ -4,9 +4,11 @@ import { useState, useEffect } from 'react';
 import { FiSearch, FiPlus, FiMinus, FiTrash2, FiPrinter, FiCreditCard, FiUser } from 'react-icons/fi';
 import { supabase } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { useRouter } from 'next/navigation';
+import { AdvancedImage } from '@cloudinary/react';
+import { fill, thumbnail } from '@cloudinary/url-gen/actions/resize';
+import { getCloudinaryImage } from '@/lib/cloudinary';
 
 export default function PosPage() {
   const [products, setProducts] = useState([]);
@@ -223,38 +225,44 @@ export default function PosPage() {
 
 // Product Card Component
 function ProductCard({ product, onAdd }) {
-  return (
-    <div 
-      className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
-      onClick={onAdd}
-    >
-      <div className="aspect-square bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-        {product.image_url ? (
-          <img 
-            src={product.image_url} 
-            alt={product.name}
-            className="object-cover w-full h-full"
-          />
-        ) : (
-          <div className="text-gray-400">No Image</div>
-        )}
-      </div>
-      <div className="p-3">
-        <h3 className="font-medium truncate">{product.name}</h3>
-        <p className="text-gray-500 text-sm truncate">{product.description}</p>
-        <div className="flex justify-between items-center mt-2">
-          <span className="font-bold">${product.price.toFixed(2)}</span>
-          <span className={`text-xs px-2 py-1 rounded-full ${
-            product.stock_quantity > 5 
-              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-              : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-          }`}>
-            {product.stock_quantity} in stock
-          </span>
+    const productImage = product.image_public_id 
+      ? getCloudinaryImage(product.image_public_id, [
+          'c_fill', 'w_300', 'h_300', 'q_auto'
+        ])
+      : null;
+  
+    return (
+      <div 
+        className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer flex flex-col h-64"
+        onClick={onAdd}
+      >
+        <div className="aspect-square bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-1 max-h-[160px]">
+          {productImage ? (
+            <AdvancedImage 
+              cldImg={productImage}
+              className="object-cover w-full h-full"
+              alt={product.name}
+            />
+          ) : (
+            <div className="text-gray-400">No Image</div>
+          )}
+        </div>
+        <div className="p-3 flex flex-col">
+          <h3 className="font-medium truncate">{product.name}</h3>
+          <p className="text-gray-500 text-sm truncate mb-2">{product.description}</p>
+          <div className="flex justify-between items-center mt-auto">
+            <span className="font-bold">${product.price.toFixed(2)}</span>
+            <span className={`text-xs px-2 py-1 rounded-full ${
+              product.stock_quantity > 5 
+                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+            }`}>
+              {product.stock_quantity} in stock
+            </span>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
 }
 
 // Cart Item Component
