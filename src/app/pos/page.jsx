@@ -1,0 +1,294 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { FiSearch, FiPlus, FiMinus, FiTrash2, FiPrinter, FiCreditCard, FiUser } from 'react-icons/fi';
+import { supabase } from '@/lib/supabase/client';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
+import { useRouter } from 'next/navigation';
+
+export default function PosPage() {
+  const [products, setProducts] = useState([]);
+  const [filteredProducts, setFilteredProducts] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [cart, setCart] = useState([]);
+  const [customer, setCustomer] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const router = useRouter();
+
+  // Fetch products
+  useEffect(() => {
+    const fetchProducts = async () => {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+
+      if (!error) {
+        setProducts(data);
+        setFilteredProducts(data);
+      }
+    };
+
+    fetchProducts();
+  }, []);
+
+  // Filter products based on search
+  useEffect(() => {
+    if (searchTerm.trim() === '') {
+      setFilteredProducts(products);
+    } else {
+      const filtered = products.filter(product =>
+        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.sku?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setFilteredProducts(filtered);
+    }
+  }, [searchTerm, products]);
+
+  // Calculate cart totals
+  const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const tax = subtotal * 0.1; // 10% tax for example
+  const total = subtotal + tax;
+
+  // Cart functions
+  const addToCart = (product) => {
+    setCart(prevCart => {
+      const existingItem = prevCart.find(item => item.id === product.id);
+      if (existingItem) {
+        return prevCart.map(item =>
+          item.id === product.id
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      } else {
+        return [...prevCart, { ...product, quantity: 1 }];
+      }
+    });
+  };
+
+  const removeFromCart = (productId) => {
+    setCart(prevCart => prevCart.filter(item => item.id !== productId));
+  };
+
+  const updateQuantity = (productId, newQuantity) => {
+    if (newQuantity < 1) return;
+    setCart(prevCart =>
+      prevCart.map(item =>
+        item.id === productId
+          ? { ...item, quantity: newQuantity }
+          : item
+      )
+    );
+  };
+
+  // Checkout function
+  const handleCheckout = async () => {
+    if (cart.length === 0) return;
+
+    // Create order
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .insert({
+        customer_id: customer?.id || null,
+        subtotal: subtotal,
+        tax_amount: tax,
+        total: total,
+        status: 'completed'
+      })
+      .select()
+      .single();
+
+    if (orderError) {
+      console.error('Error creating order:', orderError);
+      return;
+    }
+
+    // Add order items
+    const orderItems = cart.map(item => ({
+      order_id: order.id,
+      product_id: item.id,
+      quantity: item.quantity,
+      unit_price: item.price,
+      total_price: item.price * item.quantity
+    }));
+
+    const { error: itemsError } = await supabase
+      .from('order_items')
+      .insert(orderItems);
+
+    if (!itemsError) {
+      // Success - clear cart and show success
+      setCart([]);
+      router.push(`/orders/${order.id}`);
+    }
+  };
+
+  return (
+    <div className="flex h-full">
+      {/* Product Selection Panel */}
+      <div className="w-2/3 p-4 flex flex-col">
+        <div className="mb-4">
+          <Input
+            placeholder="Search products..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            icon={<FiSearch className="text-gray-400" />}
+            className="w-full"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 flex-1 overflow-y-auto">
+          {filteredProducts.map(product => (
+            <ProductCard
+              key={product.id}
+              product={product}
+              onAdd={() => addToCart(product)}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Cart Panel */}
+      <div className="w-1/3 border-l border-gray-200 dark:border-gray-700 flex flex-col">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+          <h2 className="text-xl font-bold">Current Order</h2>
+          {customer && (
+            <div className="flex items-center mt-2 text-sm">
+              <FiUser className="mr-2" />
+              <span>{customer.first_name} {customer.last_name}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4">
+          {cart.length === 0 ? (
+            <div className="text-center text-gray-500 py-8">
+              Your cart is empty
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {cart.map(item => (
+                <CartItem
+                  key={item.id}
+                  item={item}
+                  onRemove={() => removeFromCart(item.id)}
+                  onQuantityChange={(qty) => updateQuantity(item.id, qty)}
+                />
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="border-t border-gray-200 dark:border-gray-700 p-4">
+          <div className="space-y-2 mb-4">
+            <div className="flex justify-between">
+              <span>Subtotal:</span>
+              <span>${subtotal.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Tax (10%):</span>
+              <span>${tax.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between font-bold text-lg">
+              <span>Total:</span>
+              <span>${total.toFixed(2)}</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setCart([])}
+              disabled={cart.length === 0}
+            >
+              Clear
+            </Button>
+            <Button
+              onClick={handleCheckout}
+              disabled={cart.length === 0}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Checkout
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Product Card Component
+function ProductCard({ product, onAdd }) {
+  return (
+    <div 
+      className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+      onClick={onAdd}
+    >
+      <div className="aspect-square bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+        {product.image_url ? (
+          <img 
+            src={product.image_url} 
+            alt={product.name}
+            className="object-cover w-full h-full"
+          />
+        ) : (
+          <div className="text-gray-400">No Image</div>
+        )}
+      </div>
+      <div className="p-3">
+        <h3 className="font-medium truncate">{product.name}</h3>
+        <p className="text-gray-500 text-sm truncate">{product.description}</p>
+        <div className="flex justify-between items-center mt-2">
+          <span className="font-bold">${product.price.toFixed(2)}</span>
+          <span className={`text-xs px-2 py-1 rounded-full ${
+            product.stock_quantity > 5 
+              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+              : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+          }`}>
+            {product.stock_quantity} in stock
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Cart Item Component
+function CartItem({ item, onRemove, onQuantityChange }) {
+  return (
+    <li className="flex items-center justify-between p-2 border-b border-gray-100 dark:border-gray-700">
+      <div className="flex-1">
+        <h4 className="font-medium">{item.name}</h4>
+        <p className="text-sm text-gray-500">${item.price.toFixed(2)} each</p>
+      </div>
+      <div className="flex items-center space-x-2">
+        <button 
+          onClick={() => onQuantityChange(item.quantity - 1)}
+          className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+        >
+          <FiMinus className="h-4 w-4" />
+        </button>
+        <span className="w-8 text-center">{item.quantity}</span>
+        <button 
+          onClick={() => onQuantityChange(item.quantity + 1)}
+          className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+        >
+          <FiPlus className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="ml-4 font-medium">
+        ${(item.price * item.quantity).toFixed(2)}
+      </div>
+      <button 
+        onClick={onRemove}
+        className="ml-2 p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-full"
+      >
+        <FiTrash2 className="h-4 w-4" />
+      </button>
+    </li>
+  );
+}
