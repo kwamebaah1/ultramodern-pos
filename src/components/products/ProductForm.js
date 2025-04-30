@@ -159,7 +159,7 @@ export function ProductForm({ open, onOpenChange, product, onSubmit }) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="sku">SKU</Label>
+              <Label htmlFor="sku">SKU (Product Code)</Label>
               <Input
                 id="sku"
                 {...register('sku')}
