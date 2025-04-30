@@ -1,10 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { FiX } from 'react-icons/fi';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -43,6 +42,35 @@ export function ProductForm({ open, onOpenChange, product, onSubmit }) {
       is_active: true,
     },
   });
+
+  useEffect(() => {
+    if (product) {
+      reset({
+        name: product.name,
+        description: product.description || '',
+        price: product.price,
+        cost: product.cost || 0,
+        sku: product.sku || '',
+        barcode: product.barcode || '',
+        category: product.category || '',
+        stock_quantity: product.stock_quantity,
+        min_stock_level: product.min_stock_level || 5,
+        image_url: product.image_url || '',
+        image_public_id: product.image_public_id || '',
+        is_active: product.is_active !== false,
+      });
+    } else {
+      reset({
+        name: '',
+        description: '',
+        price: 0,
+        cost: 0,
+        stock_quantity: 0,
+        min_stock_level: 5,
+        is_active: true,
+      });
+    }
+  }, [product, reset]);
 
   const handleImageUpload = (publicId) => {
     setValue('image_public_id', publicId);

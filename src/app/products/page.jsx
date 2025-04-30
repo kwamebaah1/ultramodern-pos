@@ -20,7 +20,6 @@ export default function ProductsPage() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const { toast } = useToast();
 
-  // Fetch products
   useEffect(() => {
     fetchProducts();
     fetchCategories();
@@ -111,7 +110,7 @@ export default function ProductsPage() {
       cell: ({ row }) => (
         <div className="w-12 h-12 rounded-md overflow-hidden">
           <img 
-            src={row.original.image_url || '/placeholder-product.png'} 
+            src={row.original.image_url || '/shopping cart.jpg'} 
             alt={row.original.name}
             className="object-cover w-full h-full"
           />

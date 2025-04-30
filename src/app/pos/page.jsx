@@ -239,7 +239,7 @@ function ProductCard({ product, onAdd }) {
         <div className="aspect-square bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-1 max-h-[160px]">
           {productImage ? (
             <AdvancedImage 
-              cldImg={productImage}
+              cldImg={productImage || "/shopping cart.jpg"}
               className="object-cover w-full h-full"
               alt={product.name}
             />
