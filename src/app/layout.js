@@ -1,5 +1,7 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import SupabaseProvider from "@/providers/supabase-provider";
+import Sidebar from '@/components/Sidebar';
+import { ThemeProvider } from '@/components/ThemeProvider';
 import "./globals.css";
 
 const geistSans = Geist({
@@ -24,7 +26,14 @@ export default function RootLayout({ children }) {
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <SupabaseProvider>
-          {children}
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+            <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+              <Sidebar />
+              <main className="flex-1 overflow-auto p-6">
+                {children}
+              </main>
+            </div>
+          </ThemeProvider>
         </SupabaseProvider>
       </body>
     </html>
