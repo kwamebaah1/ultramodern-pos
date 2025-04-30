@@ -28,9 +28,9 @@ const productSchema = z.object({
 });
 
 export function ProductForm({ open, onOpenChange, product, onSubmit }) {
-  const { toast } = useToast();
+  const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const { register, handleSubmit, formState: { errors }, reset, setValue } = useForm({
+  const { register, handleSubmit, formState: { errors }, reset, setValue, watch } = useForm({
     resolver: zodResolver(productSchema),
     defaultValues: product || {
       name: '',
@@ -87,7 +87,7 @@ export function ProductForm({ open, onOpenChange, product, onSubmit }) {
       }
       reset();
     } catch (error) {
-      toast({
+      showToast({
         title: 'Error',
         description: error.message,
         variant: 'destructive',
@@ -197,7 +197,15 @@ export function ProductForm({ open, onOpenChange, product, onSubmit }) {
 
             <div className="space-y-2">
               <Label>Product Image</Label>
-              <ImageUpload onUpload={handleImageUpload} />
+              <ImageUpload 
+                onUpload={(publicId) => {
+                  setValue('image_public_id', publicId);
+                  setValue('image_url', 
+                    `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/${publicId}`
+                  );
+                }}
+                currentImage={watch('image_url')}
+              />
               {errors.image_public_id?.message && (
                 <p className="text-sm text-red-500">{errors.image_public_id.message}</p>
               )}
