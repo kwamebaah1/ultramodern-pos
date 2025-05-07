@@ -33,7 +33,6 @@ export default function OrderReceipt({ params }) {
 
       setOrder(orderData);
 
-      // Fetch order items with product details
       const { data: itemsData, error: itemsError } = await supabase
         .from('order_items')
         .select(`
@@ -98,8 +97,9 @@ export default function OrderReceipt({ params }) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
-      <div className={`max-w-4xl mx-auto mb-6 ${isPrinting ? 'hidden' : 'block'}`}>
+    <div className="min-h-screen bg-gray-50 p-4 md:p-8 print:p-0">
+      {/* Print Controls (hidden when printing) */}
+      <div className={`max-w-4xl mx-auto mb-6 print:hidden ${isPrinting ? 'hidden' : 'block'}`}>
         <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
           <Button
             variant="outline"
@@ -119,49 +119,50 @@ export default function OrderReceipt({ params }) {
         </div>
       </div>
 
-      {/* Receipt */}
-      <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-sm overflow-hidden">
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white">
+      {/* Receipt Container */}
+      <div id="receipt" className="max-w-4xl mx-auto bg-white rounded-lg shadow-sm overflow-hidden print:shadow-none print:rounded-none print:max-w-full">
+        {/* Receipt Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white print:p-4">
           <div className="flex justify-between items-start">
             <div>
-              <h1 className="text-2xl font-bold">Order Receipt</h1>
-              <p className="text-blue-100">Thank you for your purchase!</p>
+              <h1 className="text-2xl font-bold print:text-xl">Order Receipt</h1>
+              <p className="text-blue-100 print:text-blue-200">Thank you for your purchase!</p>
             </div>
             <div className="text-right">
-              <p className="text-blue-100">Order #</p>
-              <p className="font-mono text-xl font-bold">{order.id}</p>
+              <p className="text-blue-100 print:text-blue-200">Order #</p>
+              <p className="font-mono text-xl font-bold print:text-lg">{order.id}</p>
             </div>
           </div>
         </div>
 
         {/* Order Info */}
-        <div className="p-6 border-b border-gray-100">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="p-6 border-b border-gray-100 print:p-4 print:border-b-2">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 print:grid-cols-3 print:gap-2">
             <div className="flex items-center gap-3">
-              <div className="bg-blue-100 p-2 rounded-full text-blue-600">
-                <FiCalendar className="h-5 w-5" />
+              <div className="bg-blue-100 p-2 rounded-full text-blue-600 print:p-1">
+                <FiCalendar className="h-5 w-5 print:h-4 print:w-4" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">Date</p>
-                <p className="font-medium">{formatDate(order.created_at)}</p>
+                <p className="text-sm text-gray-500 print:text-xs">Date</p>
+                <p className="font-medium print:text-sm">{formatDate(order.created_at)}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <div className="bg-blue-100 p-2 rounded-full text-blue-600">
-                <FiClock className="h-5 w-5" />
+              <div className="bg-blue-100 p-2 rounded-full text-blue-600 print:p-1">
+                <FiClock className="h-5 w-5 print:h-4 print:w-4" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">Time</p>
-                <p className="font-medium">{formatTime(order.created_at)}</p>
+                <p className="text-sm text-gray-500 print:text-xs">Time</p>
+                <p className="font-medium print:text-sm">{formatTime(order.created_at)}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <div className="bg-blue-100 p-2 rounded-full text-blue-600">
-                <FiCreditCard className="h-5 w-5" />
+              <div className="bg-blue-100 p-2 rounded-full text-blue-600 print:p-1">
+                <FiCreditCard className="h-5 w-5 print:h-4 print:w-4" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">Payment</p>
-                <p className="font-medium capitalize">{order.payment_method || 'Cash'}</p>
+                <p className="text-sm text-gray-500 print:text-xs">Payment</p>
+                <p className="font-medium capitalize print:text-sm">{order.payment_method || 'Cash'}</p>
               </div>
             </div>
           </div>
@@ -169,17 +170,17 @@ export default function OrderReceipt({ params }) {
 
         {/* Customer Info */}
         {customer && (
-          <div className="p-6 border-b border-gray-100">
+          <div className="p-6 border-b border-gray-100 print:p-4 print:border-b-2">
             <div className="flex items-center gap-3">
-              <div className="bg-blue-100 p-2 rounded-full text-blue-600">
-                <FiUser className="h-5 w-5" />
+              <div className="bg-blue-100 p-2 rounded-full text-blue-600 print:p-1">
+                <FiUser className="h-5 w-5 print:h-4 print:w-4" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">Customer</p>
-                <p className="font-medium">
+                <p className="text-sm text-gray-500 print:text-xs">Customer</p>
+                <p className="font-medium print:text-sm">
                   {customer.first_name} {customer.last_name}
                   {customer.email && (
-                    <span className="block text-sm text-gray-500">{customer.email}</span>
+                    <span className="block text-sm text-gray-500 print:text-xs">{customer.email}</span>
                   )}
                 </p>
               </div>
@@ -188,9 +189,9 @@ export default function OrderReceipt({ params }) {
         )}
 
         {/* Order Items */}
-        <div className="p-6">
-          <h2 className="text-lg font-semibold mb-4">Order Items</h2>
-          <div className="space-y-4">
+        <div className="p-6 print:p-4">
+          <h2 className="text-lg font-semibold mb-4 print:text-base print:mb-2">Order Items</h2>
+          <div className="space-y-4 print:space-y-2">
             {items.map((item) => {
               const productImage = item.products?.image_public_id
                 ? getCloudinaryImage(item.products.image_public_id, [
@@ -199,9 +200,9 @@ export default function OrderReceipt({ params }) {
                 : null;
 
               return (
-                <div key={item.id} className="flex items-start gap-4 pb-4 border-b border-gray-100 last:border-0">
+                <div key={item.id} className="flex items-start gap-4 pb-4 border-b border-gray-100 last:border-0 print:pb-2 print:border-b-2 print:gap-2">
                   {productImage ? (
-                    <div className="w-16 h-16 rounded-md overflow-hidden bg-gray-100">
+                    <div className="w-16 h-16 rounded-md overflow-hidden bg-gray-100 print:hidden">
                       <AdvancedImage 
                         cldImg={productImage}
                         className="object-cover w-full h-full"
@@ -209,16 +210,16 @@ export default function OrderReceipt({ params }) {
                       />
                     </div>
                   ) : (
-                    <div className="w-16 h-16 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center text-gray-400">
+                    <div className="w-16 h-16 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center text-gray-400 print:hidden">
                       No Image
                     </div>
                   )}
                   <div className="flex-1">
-                    <h3 className="font-medium">{item.products?.name || 'Product'}</h3>
-                    <p className="text-sm text-gray-500">${item.unit_price.toFixed(2)} × {item.quantity}</p>
+                    <h3 className="font-medium print:text-sm">{item.products?.name || 'Product'}</h3>
+                    <p className="text-sm text-gray-500 print:text-xs">${item.unit_price.toFixed(2)} × {item.quantity}</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium">${item.total_price.toFixed(2)}</p>
+                    <p className="font-medium print:text-sm">${item.total_price.toFixed(2)}</p>
                   </div>
                 </div>
               );
@@ -227,28 +228,28 @@ export default function OrderReceipt({ params }) {
         </div>
 
         {/* Order Summary */}
-        <div className="p-6 bg-gray-50">
-          <div className="space-y-2">
+        <div className="p-6 bg-gray-50 print:p-4">
+          <div className="space-y-2 print:space-y-1">
             <div className="flex justify-between">
-              <span className="text-gray-600">Subtotal:</span>
-              <span className="font-medium">${order.subtotal.toFixed(2)}</span>
+              <span className="text-gray-600 print:text-sm">Subtotal:</span>
+              <span className="font-medium print:text-sm">${order.subtotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">Tax ({order.tax_amount > 0 ? (order.tax_amount / order.subtotal * 100).toFixed(0) : 0}%):</span>
-              <span className="font-medium">${order.tax_amount.toFixed(2)}</span>
+              <span className="text-gray-600 print:text-sm">Tax ({order.tax_amount > 0 ? (order.tax_amount / order.subtotal * 100).toFixed(0) : 0}%):</span>
+              <span className="font-medium print:text-sm">${order.tax_amount.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between pt-2 border-t border-gray-200">
-              <span className="font-semibold">Total:</span>
-              <span className="font-bold text-lg">${order.total.toFixed(2)}</span>
+            <div className="flex justify-between pt-2 border-t border-gray-200 print:pt-1 print:border-t-2">
+              <span className="font-semibold print:text-sm">Total:</span>
+              <span className="font-bold text-lg print:text-base">${order.total.toFixed(2)}</span>
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="p-6 bg-white border-t border-gray-100">
-          <div className="text-center text-sm text-gray-500">
+        <div className="p-6 bg-white border-t border-gray-100 print:p-4 print:border-t-2">
+          <div className="text-center text-sm text-gray-500 print:text-xs">
             <p>Thank you for shopping with us!</p>
-            <p className="mt-1">For any inquiries, please contact our support team.</p>
+            <p className="mt-1 print:mt-0">For any inquiries, please contact our support team.</p>
           </div>
         </div>
       </div>
@@ -256,22 +257,32 @@ export default function OrderReceipt({ params }) {
       {/* Print Styles */}
       <style jsx global>{`
         @media print {
-          body * {
-            visibility: hidden;
+          body {
+            margin: 0;
+            padding: 0;
+            background: white;
+            font-size: 12px;
           }
-          .print-receipt, .print-receipt * {
-            visibility: visible;
-          }
-          .print-receipt {
-            position: absolute;
-            left: 0;
-            top: 0;
+          #receipt {
             width: 100%;
             max-width: 100%;
+            margin: 0;
+            padding: 0;
             box-shadow: none;
+            border-radius: 0;
+            page-break-after: avoid;
+            page-break-inside: avoid;
           }
-          .no-print {
+          .no-print, .no-print * {
             display: none !important;
+          }
+          * {
+            -webkit-print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
+          @page {
+            size: auto;
+            margin: 5mm;
           }
         }
       `}</style>
