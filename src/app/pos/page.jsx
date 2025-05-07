@@ -53,7 +53,7 @@ export default function PosPage() {
 
   // Calculate cart totals
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const tax = subtotal * 0.1; // 10% tax for example
+  const tax = subtotal * 0.1;
   const total = subtotal + tax;
 
   // Cart functions
@@ -123,7 +123,6 @@ export default function PosPage() {
       .insert(orderItems);
 
     if (!itemsError) {
-      // Success - clear cart and show success
       setCart([]);
       router.push(`/orders/${order.id}`);
     }
