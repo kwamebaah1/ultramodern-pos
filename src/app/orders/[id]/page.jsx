@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { FiPrinter, FiArrowLeft, FiClock, FiCalendar, FiUser, FiCreditCard } from 'react-icons/fi';
 import { supabase } from '@/lib/supabase/client';
@@ -9,14 +9,15 @@ import { AdvancedImage } from '@cloudinary/react';
 import { getCloudinaryImage } from '@/lib/cloudinary';
 
 export default function OrderReceipt({ params }) {
-  const { id } = params;
+  const unwrappedParams = use(params);
+  const { id } = unwrappedParams;
   const [order, setOrder] = useState(null);
   const [items, setItems] = useState([]);
   const [customer, setCustomer] = useState(null);
   const [isPrinting, setIsPrinting] = useState(false);
   const router = useRouter();
 
-  let orderid = id;
+  const orderid = id;
 
   useEffect(() => {
     const fetchOrderData = async () => {
