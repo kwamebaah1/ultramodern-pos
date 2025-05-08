@@ -7,8 +7,8 @@ import { Input } from '@/components/ui/Input';
 
 export default function CustomerFormModal({ initialSearch, onSuccess, onClose }) {
   const [formData, setFormData] = useState({
-    first_name: initialSearch.split(' ')[0] || '',
-    last_name: initialSearch.split(' ').slice(1).join(' ') || '',
+    first_name: initialSearch?.split(' ')[0] || '',
+    last_name: initialSearch?.split(' ').slice(1).join(' ') || '',
     email: '',
     phone: '',
     address: '',
