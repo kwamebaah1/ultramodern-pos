@@ -1,14 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FiSearch, FiPlus, FiMinus, FiTrash2, FiPrinter, FiCreditCard, FiUser } from 'react-icons/fi';
+import { FiSearch, FiPlus, FiMinus, FiTrash2, FiPrinter, FiCreditCard, FiUser, FiDollarSign } from 'react-icons/fi';
 import { supabase } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useRouter } from 'next/navigation';
 import { AdvancedImage } from '@cloudinary/react';
-import { fill, thumbnail } from '@cloudinary/url-gen/actions/resize';
 import { getCloudinaryImage } from '@/lib/cloudinary';
+import CustomerSelect from '@/components/customers/CustomerSelect';
+import CustomerFormModal from '@/components/customers/CustomerFormModal.';
 
 export default function PosPage() {
   const [products, setProducts] = useState([]);
@@ -17,6 +18,8 @@ export default function PosPage() {
   const [cart, setCart] = useState([]);
   const [customer, setCustomer] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [customerSearchTerm, setCustomerSearchTerm] = useState('');
   const router = useRouter();
 
   // Fetch products
@@ -87,49 +90,90 @@ export default function PosPage() {
     );
   };
 
-  // Checkout function
+  const handleCreateCustomer = (searchTerm) => {
+    setCustomerSearchTerm(searchTerm);
+    setShowCustomerModal(true);
+  };
+
+  const handleCustomerCreated = (newCustomer) => {
+    setCustomer(newCustomer);
+    setShowCustomerModal(false);
+  };
+
+  // Checkout function with loyalty points update
   const handleCheckout = async () => {
     if (cart.length === 0) return;
 
-    // Create order
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .insert({
-        customer_id: customer?.id || null,
-        subtotal: subtotal,
-        tax_amount: tax,
-        total: total,
-        status: 'completed'
-      })
-      .select()
-      .single();
+    // Calculate loyalty points (1 point per $10 spent)
+    const pointsEarned = Math.floor(total / 10);
 
-    if (orderError) {
-      console.error('Error creating order:', orderError);
-      return;
-    }
+    try {
+      // Update customer loyalty points if applicable
+      if (customer?.id) {
+        await supabase
+          .from('customers')
+          .update({ loyalty_points: customer.loyalty_points + pointsEarned })
+          .eq('id', customer.id);
+      }
 
-    // Add order items
-    const orderItems = cart.map(item => ({
-      order_id: order.id,
-      product_id: item.id,
-      quantity: item.quantity,
-      unit_price: item.price,
-      total_price: item.price * item.quantity
-    }));
+      // Create order
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          customer_id: customer?.id || null,
+          subtotal: subtotal,
+          tax_amount: tax,
+          total: total,
+          payment_method: paymentMethod,
+          status: 'completed',
+          loyalty_points_earned: pointsEarned
+        })
+        .select()
+        .single();
 
-    const { error: itemsError } = await supabase
-      .from('order_items')
-      .insert(orderItems);
+      if (orderError) throw orderError;
 
-    if (!itemsError) {
+      // Add order items
+      const orderItems = cart.map(item => ({
+        order_id: order.id,
+        product_id: item.id,
+        quantity: item.quantity,
+        unit_price: item.price,
+        total_price: item.price * item.quantity
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+
+      if (itemsError) throw itemsError;
+
+      // Update product stock quantities
+      for (const item of cart) {
+        await supabase
+          .from('products')
+          .update({ stock_quantity: item.stock_quantity - item.quantity })
+          .eq('id', item.id);
+      }
+
       setCart([]);
       router.push(`/orders/${order.id}`);
+    } catch (error) {
+      console.error('Checkout error:', error);
+      alert('There was an error processing your order. Please try again.');
     }
   };
 
   return (
     <div className="flex h-full">
+      {showCustomerModal && (
+        <CustomerFormModal
+          initialSearch={customerSearchTerm}
+          onSuccess={handleCustomerCreated}
+          onClose={() => setShowCustomerModal(false)}
+        />
+      )}
+
       {/* Product Selection Panel */}
       <div className="w-2/3 p-4 flex flex-col">
         <div className="mb-4">
@@ -157,12 +201,33 @@ export default function PosPage() {
       <div className="w-1/3 border-l border-gray-200 dark:border-gray-700 flex flex-col">
         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
           <h2 className="text-xl font-bold">Current Order</h2>
-          {customer && (
-            <div className="flex items-center mt-2 text-sm">
-              <FiUser className="mr-2" />
-              <span>{customer.first_name} {customer.last_name}</span>
+          <div className="mt-3">
+            <CustomerSelect
+              selectedCustomer={customer}
+              onSelect={setCustomer}
+              onCreateNew={handleCreateCustomer}
+            />
+          </div>
+          
+          <div className="mt-4">
+            <label className="block text-sm font-medium mb-1">Payment Method</label>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant={paymentMethod === 'cash' ? 'default' : 'outline'}
+                onClick={() => setPaymentMethod('cash')}
+                className="flex items-center gap-2"
+              >
+                <FiDollarSign /> Cash
+              </Button>
+              <Button
+                variant={paymentMethod === 'card' ? 'default' : 'outline'}
+                onClick={() => setPaymentMethod('card')}
+                className="flex items-center gap-2"
+              >
+                <FiCreditCard /> Card
+              </Button>
             </div>
-          )}
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">
@@ -194,6 +259,12 @@ export default function PosPage() {
               <span>Tax (10%):</span>
               <span>${tax.toFixed(2)}</span>
             </div>
+            {customer?.loyalty_points !== undefined && (
+              <div className="flex justify-between text-blue-600 dark:text-blue-400">
+                <span>Loyalty Points:</span>
+                <span>{customer.loyalty_points} (+{Math.floor(total / 10)})</span>
+              </div>
+            )}
             <div className="flex justify-between font-bold text-lg">
               <span>Total:</span>
               <span>${total.toFixed(2)}</span>
@@ -238,7 +309,7 @@ function ProductCard({ product, onAdd }) {
         <div className="aspect-square bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-1 max-h-[160px]">
           {productImage ? (
             <AdvancedImage 
-              cldImg={productImage || "/shopping cart.jpg"}
+              cldImg={productImage}
               className="object-cover w-full h-full"
               alt={product.name}
             />
