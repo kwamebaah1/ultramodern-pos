@@ -6,6 +6,7 @@ import {
   FiHome, FiShoppingCart, FiPieChart, 
   FiUsers, FiSettings, FiSun, FiMoon, FiShoppingBag
 } from 'react-icons/fi';
+import { HiOutlineClipboardList } from 'react-icons/hi';
 import { useTheme } from 'next-themes';
 import { Button } from './ui/Button';
 
@@ -15,6 +16,7 @@ const navItems = [
   { name: 'Analytics', href: '/analytics', icon: FiPieChart },
   { name: 'Customers', href: '/customers', icon: FiUsers },
   { name: 'Inventory', href: '/products', icon: FiPieChart },
+  { name: 'Orders', href: '/orders', icon: HiOutlineClipboardList },
   { name: 'Settings', href: '/settings', icon: FiSettings },
 ];
 
