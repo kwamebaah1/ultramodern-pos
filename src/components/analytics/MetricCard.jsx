@@ -1,4 +1,3 @@
-// components/analytics/MetricCard.jsx
 'use client';
 
 import { cn } from '@/lib/utils';
