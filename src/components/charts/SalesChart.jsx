@@ -24,42 +24,64 @@ ChartJS.register(
   Filler
 );
 
-export function SalesChart() {
+export function SalesChart({ data }) {
   const options = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
       legend: {
-        position: 'top',
+        display: false,
       },
+      tooltip: {
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        titleFont: {
+          size: 14,
+          weight: 'bold'
+        },
+        bodyFont: {
+          size: 12
+        },
+        callbacks: {
+          label: (context) => {
+            return ` $${context.raw.toFixed(2)}`;
+          }
+        },
+        displayColors: false,
+        padding: 12,
+        cornerRadius: 8
+      }
     },
     scales: {
       y: {
         beginAtZero: true,
         grid: {
           color: 'rgba(0, 0, 0, 0.05)',
+          drawBorder: false,
         },
+        ticks: {
+          callback: (value) => `$${value}`,
+          font: {
+            size: 12
+          }
+        }
       },
       x: {
         grid: {
           display: false,
+          drawBorder: false,
         },
+        ticks: {
+          font: {
+            size: 12
+          }
+        }
       },
     },
-  };
-
-  const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'];
-  const data = {
-    labels,
-    datasets: [
-      {
-        label: 'Sales',
-        data: [65, 59, 80, 81, 56, 55, 40],
-        borderColor: 'rgb(59, 130, 246)',
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        tension: 0.4,
-        fill: true,
-      },
-    ],
+    elements: {
+      line: {
+        tension: 0.4
+      }
+    }
   };
 
   return <Line options={options} data={data} />;

@@ -5,26 +5,46 @@ import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
-export function InventoryStatus() {
-  const data = {
-    labels: ['In Stock', 'Low Stock', 'Out of Stock'],
-    datasets: [
-      {
-        data: [75, 15, 10],
-        backgroundColor: [
-          'rgba(34, 197, 94, 0.8)',
-          'rgba(234, 179, 8, 0.8)',
-          'rgba(239, 68, 68, 0.8)',
-        ],
-        borderColor: [
-          'rgba(34, 197, 94, 1)',
-          'rgba(234, 179, 8, 1)',
-          'rgba(239, 68, 68, 1)',
-        ],
-        borderWidth: 1,
+export function InventoryStatus({ data }) {
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'right',
+        labels: {
+          boxWidth: 12,
+          padding: 16,
+          font: {
+            size: 12
+          },
+          usePointStyle: true,
+        }
       },
-    ],
+      tooltip: {
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        titleFont: {
+          size: 14,
+          weight: 'bold'
+        },
+        bodyFont: {
+          size: 12
+        },
+        callbacks: {
+          label: (context) => {
+            const total = context.dataset.data.reduce((acc, curr) => acc + curr, 0);
+            const value = context.raw;
+            const percentage = Math.round((value / total) * 100);
+            return ` ${context.label}: ${value} (${percentage}%)`;
+          }
+        },
+        displayColors: false,
+        padding: 12,
+        cornerRadius: 8
+      }
+    },
+    cutout: '70%',
   };
 
-  return <Doughnut data={data} />;
+  return <Doughnut options={options} data={data} />;
 }
