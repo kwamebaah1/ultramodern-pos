@@ -51,7 +51,7 @@ export default function Dashboard() {
       setMetrics([
         { 
           title: 'Total Revenue', 
-          value: `$${revenueData[0]?.total_revenue?.toFixed(2) || '0.00'}`, 
+          value: `GH₵${revenueData[0]?.total_revenue?.toFixed(2) || '0.00'}`, 
           change: `${revenueData[0]?.change_percentage >= 0 ? '+' : ''}${revenueData[0]?.change_percentage || 0}%`, 
           icon: FiDollarSign 
         },
@@ -69,7 +69,7 @@ export default function Dashboard() {
         },
         { 
           title: 'Avg. Order Value', 
-          value: `$${avgOrderData[0]?.avg_order_value?.toFixed(2) || '0.00'}`, 
+          value: `GH₵${avgOrderData[0]?.avg_order_value?.toFixed(2) || '0.00'}`, 
           change: `${avgOrderData[0]?.change_percentage >= 0 ? '+' : ''}${avgOrderData[0]?.change_percentage || 0}%`, 
           icon: FiTrendingUp 
         },
