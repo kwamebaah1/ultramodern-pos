@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
+import { Card } from '../ui/Card';
 
 export function MetricCard({ title, value, change, icon: Icon, trend }) {
   return (
