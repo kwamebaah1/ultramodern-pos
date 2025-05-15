@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
+import toast from 'react-hot-toast';
 import Head from 'next/head';
 
 export default function SignUp() {
@@ -60,9 +61,12 @@ export default function SignUp() {
 
       if (userError) throw userError;
 
-      router.push(`/dashboard/${storeData.slug}`);
+      toast.success('Account created! Redirecting...');
+      router.push("/");
+      //router.push(`/dashboard/${storeData.slug}`);
     } catch (err) {
       setError(err.message);
+      toast.error(err.message);
     } finally {
       setLoading(false);
     }

@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/router';
-import { supabase } from '../lib/supabaseClient';
+import toast from 'react-hot-toast';
+import { supabase } from '@/lib/supabase/client';
 import Head from 'next/head';
 
 export default function Login() {
@@ -45,9 +46,12 @@ export default function Login() {
         throw new Error('No stores found for this user');
       }
 
-      router.push(`/dashboard/${userStores[0].stores.slug}`);
+      toast.success('Login Successful! Redirecting...');
+      router.push(`/`);
+      //router.push(`/dashboard/${userStores[0].stores.slug}`);
     } catch (err) {
       setError(err.message);
+      toast.error(err.message);
     } finally {
       setLoading(false);
     }
