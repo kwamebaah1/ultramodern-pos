@@ -24,10 +24,33 @@ export default function PosPage() {
 
   // Fetch products
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchProducts = async () => {const {
+      data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        console.error('User not found:', userError);
+        return;
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from('users')
+        .select('store_id')
+        .eq('auth_user_id', user.id)
+        .single();
+
+      if (profileError || !profile?.store_id) {
+        console.error('Failed to fetch store_id:', profileError);
+        return;
+      }
+
+      const storeId = profile.store_id;
+
       const { data, error } = await supabase
         .from('products')
         .select('*')
+        .eq('store_id', storeId)
         .eq('is_active', true)
         .order('name', { ascending: true });
 
@@ -108,6 +131,22 @@ export default function PosPage() {
     const pointsEarned = Math.floor(total / 10);
 
     try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) throw userError;
+
+      const { data: profile, error: profileError } = await supabase
+        .from('users')
+        .select('store_id')
+        .eq('auth_user_id', user.id)
+        .single();
+
+      if (profileError || !profile?.store_id) throw profileError;
+
+      const storeId = profile.store_id;
       // Update customer loyalty points if applicable
       if (customer?.id) {
         await supabase
@@ -126,7 +165,8 @@ export default function PosPage() {
           total: total,
           payment_method: paymentMethod,
           status: 'completed',
-          loyalty_points_earned: pointsEarned
+          loyalty_points_earned: pointsEarned,
+          store_id: storeId,
         })
         .select()
         .single();
