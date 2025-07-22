@@ -20,6 +20,18 @@ export default function Dashboard() {
   const fetchDashboardData = async () => {
     setIsLoading(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const { data: userData } = await supabase
+        .from('users')
+        .select('store_id')
+        .eq('auth_user_id', user.id)
+        .single();
+
+      if (!userData?.store_id) throw new Error('No store associated with user');
+
+      const storeId = userData.store_id;
+
       const [
         { data: revenueData },
         { data: salesCount },
@@ -29,12 +41,12 @@ export default function Dashboard() {
         { data: inventoryStats },
         { data: recentOrders }
       ] = await Promise.all([
-        supabase.rpc('calculate_total_revenue'),
-        supabase.rpc('count_total_sales'),
-        supabase.rpc('count_new_customers'),
-        supabase.rpc('calculate_avg_order_value'),
-        supabase.rpc('get_monthly_sales'),
-        supabase.rpc('get_inventory_status'),
+        supabase.rpc('calculate_total_revenue', { p_store_id: storeId }),
+        supabase.rpc('count_total_sales', { p_store_id: storeId }),
+        supabase.rpc('count_new_customers', { p_store_id: storeId }),
+        supabase.rpc('calculate_avg_order_value', { p_store_id: storeId }),
+        supabase.rpc('get_monthly_sales', { p_store_id: storeId }),
+        supabase.rpc('get_inventory_status', { p_store_id: storeId }),
         supabase
           .from('orders')
           .select(`
@@ -44,9 +56,17 @@ export default function Dashboard() {
             created_at,
             customer_id (first_name, last_name)
           `)
+          .eq('store_id', storeId)
           .order('created_at', { ascending: false })
           .limit(5)
       ]);
+      console.log("revenueData", revenueData)
+      console.log("salesCount", salesCount)
+      console.log("customersCount", customersCount)
+      console.log("avgOrderData", avgOrderData)
+      console.log("monthlySales", monthlySales)
+      console.log("inventoryStats", inventoryStats)
+      console.log("recentOrders", recentOrders)
 
       setMetrics([
         { 
