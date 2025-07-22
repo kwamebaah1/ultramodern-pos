@@ -46,6 +46,22 @@ export default function Login() {
         throw new Error('No stores found for this user');
       }
 
+      const { data: storeData, error: storeError } = await supabase
+        .from('stores')
+        .select('subscription_status, current_period_end, billing_enabled')
+        .eq('id', userStores[0].store_id)
+        .single();
+
+      if (storeError) throw storeError;
+
+      // Redirect to payment if subscription not active
+      if (storeData.billing_enabled && 
+          (storeData.subscription_status !== 'active' || 
+          new Date(storeData.current_period_end) < new Date())) {
+        router.push(`/subscribe?store_id=${userStores[0].store_id}`);
+        return;
+      }
+
       toast.success('Login Successful! Redirecting...');
       router.push(`/`);
       //router.push(`/dashboard/${userStores[0].stores.slug}`);

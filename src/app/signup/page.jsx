@@ -44,6 +44,9 @@ export default function SignUp() {
           name: formData.storeName,
           slug: formData.storeName.toLowerCase().replace(/\s+/g, '-'),
           owner_id: authData.user.id,
+          subscription_status: 'trial',
+          trial_ends_at: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+          billing_enabled: true
         })
         .select()
         .single();
