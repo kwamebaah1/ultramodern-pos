@@ -10,6 +10,7 @@ import { AdvancedImage } from '@cloudinary/react';
 import { getCloudinaryImage } from '@/lib/cloudinary';
 import CustomerSelect from '@/components/customers/CustomerSelect';
 import CustomerFormModal from '@/components/customers/CustomerFormModal.';
+import toast from 'react-hot-toast';
 
 export default function PosPage() {
   const [products, setProducts] = useState([]);
@@ -197,6 +198,7 @@ export default function PosPage() {
       }
 
       setCart([]);
+      toast.success('Order placed successfully!');
       router.push(`/orders/${order.id}`);
     } catch (error) {
       console.error('Checkout error:', error);
