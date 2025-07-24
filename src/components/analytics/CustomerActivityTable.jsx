@@ -16,20 +16,17 @@ export function CustomerActivityTable({ data }) {
             </div>
             <div>
               <p className="font-medium text-gray-900 dark:text-white">
-                {customer.first_name} {customer.last_name}
-              </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {customer.email}
+                {customer.customer_name}
               </p>
             </div>
           </div>
           <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-300">
             <FiShoppingBag className="h-4 w-4" />
-            <span>{customer.order_count} orders</span>
+            <span>{customer.total_orders} order(s)</span>
           </div>
           <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-300">
             <FiDollarSign className="h-4 w-4" />
-            <span>${customer.total_spent.toFixed(2)}</span>
+            <span>{customer.total_spent.toFixed(2)}</span>
           </div>
           <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-300">
             <FiCalendar className="h-4 w-4" />
