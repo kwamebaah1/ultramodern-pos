@@ -21,10 +21,27 @@ export default function CustomersPage() {
   useEffect(() => {
     const fetchCustomers = async () => {
       setIsLoading(true);
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      const { data: userProfile, error: userError } = await supabase
+        .from('users')
+        .select('store_id')
+        .eq('auth_user_id', user.id)
+        .single();
+
+      if (userError || !userProfile?.store_id) {
+        console.error('Store ID not found');
+        return;
+      }
+
       try {
         const { data, error } = await supabase
           .from('customers')
           .select('*')
+          .eq('store_id', userProfile.store_id)
           .order('created_at', { ascending: false });
 
         if (!error) {
