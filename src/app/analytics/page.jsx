@@ -38,7 +38,26 @@ export default function AnalyticsPage() {
 
   const fetchAnalyticsData = async () => {
     setIsLoading(true);
+
     try {
+      const {
+      data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        console.error('User not found:', userError);
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from('users')
+        .select('store_id')
+        .eq('auth_user_id', user.id)
+        .single();
+
+      const storeId = profile.store_id;
+    
       const [
         { data: metrics },
         { data: salesTrend },
@@ -48,27 +67,35 @@ export default function AnalyticsPage() {
       ] = await Promise.all([
         supabase.rpc('get_analytics_metrics', {
           start_date: dateRange.start.toISOString(),
-          end_date: dateRange.end.toISOString()
+          end_date: dateRange.end.toISOString(),
+          p_store_id: storeId
         }),
         supabase.rpc('get_sales_trend', {
           start_date: dateRange.start.toISOString(),
-          end_date: dateRange.end.toISOString()
+          end_date: dateRange.end.toISOString(),
+          p_store_id: storeId
         }),
         supabase.rpc('get_revenue_breakdown', {
           start_date: dateRange.start.toISOString(),
-          end_date: dateRange.end.toISOString()
+          end_date: dateRange.end.toISOString(),
+          p_store_id: storeId
         }),
         supabase.rpc('get_top_products', {
           start_date: dateRange.start.toISOString(),
           end_date: dateRange.end.toISOString(),
-          limit_num: 5
+          limit_num: 5,
+          p_store_id: storeId
         }),
         supabase.rpc('get_customer_activity', {
           start_date: dateRange.start.toISOString(),
           end_date: dateRange.end.toISOString(),
-          limit_num: 5
+          limit_num: 5,
+          p_store_id: storeId
         })
       ]);
+
+      console.log("revenueBreakdown", revenueBreakdown)
+      console.log("customerActivity", customerActivity)
 
       setData({
         metrics,
