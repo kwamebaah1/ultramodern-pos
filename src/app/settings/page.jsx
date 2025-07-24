@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase/client';
 import StoreSettings from '@/components/settings/StoreSettings';
 import UserManagement from '@/components/settings/UserManagement';
 import EmailMarketing from '@/components/settings/EmailMarketing';
-import { FiSettings, FiUsers, FiMail, FiLock } from 'react-icons/fi';
+import { FiSettings, FiUsers, FiMail } from 'react-icons/fi';
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('store');
