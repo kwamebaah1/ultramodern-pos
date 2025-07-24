@@ -79,7 +79,7 @@ export default function SettingsPage() {
             <FiSettings /> Store Settings
           </button>
           
-          {userRole === 'admin' && (
+          {userRole === 'owner' && (
             <>
               <button
                 onClick={() => setActiveTab('users')}
@@ -110,8 +110,8 @@ export default function SettingsPage() {
       {/* Tab Content */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
         {activeTab === 'store' && <StoreSettings storeData={storeData} />}
-        {activeTab === 'users' && userRole === 'admin' && <UserManagement storeId={storeData?.id} />}
-        {activeTab === 'email' && userRole === 'admin' && <EmailMarketing storeId={storeData?.id} />}
+        {activeTab === 'users' && userRole === 'owner' && <UserManagement storeId={storeData?.id} />}
+        {activeTab === 'email' && userRole === 'owner' && <EmailMarketing storeId={storeData?.id} />}
       </div>
     </div>
   );
