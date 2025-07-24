@@ -26,9 +26,25 @@ export default function ProductsPage() {
   }, []);
 
   const fetchProducts = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const { data: userProfile, error: userError } = await supabase
+      .from('users')
+      .select('store_id')
+      .eq('auth_user_id', user.id)
+      .single();
+
+    if (userError || !userProfile?.store_id) {
+      console.error('Store ID not found');
+      return;
+    }
+
     const { data, error } = await supabase
       .from('products')
       .select('*')
+      .eq('store_id', userProfile.store_id)
       .order('name', { ascending: true });
 
     if (!error) {
