@@ -1,6 +1,6 @@
 'use client';
 
-import { FiShoppingBag, FiDollarSign, FiCalendar } from 'react-icons/fi';
+import { FiShoppingBag, FiDollarSign, FiCalendar, FiUsers } from 'react-icons/fi';
 
 export function CustomerActivityTable({ data }) {
   return (
