@@ -342,6 +342,7 @@ export default function UserManagement({ storeId }) {
                       type="email"
                       value={formData.email}
                       onChange={handleChange}
+                      placeholder='Email'
                       required
                       disabled={isLoading}
                     />
@@ -354,6 +355,7 @@ export default function UserManagement({ storeId }) {
                     name="first_name"
                     value={formData.first_name}
                     onChange={handleChange}
+                    placeholder='First Name'
                     required
                     disabled={isLoading}
                   />
@@ -363,6 +365,7 @@ export default function UserManagement({ storeId }) {
                     name="last_name"
                     value={formData.last_name}
                     onChange={handleChange}
+                    placeholder='Last Name'
                     required
                     disabled={isLoading}
                   />

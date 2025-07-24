@@ -13,7 +13,6 @@ export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [userRole, setUserRole] = useState('cashier');
 
-  // Fetch store data and user role
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
