@@ -22,6 +22,22 @@ export default function OrdersPage() {
   useEffect(() => {
     const fetchOrders = async () => {
       setIsLoading(true);
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      
+      const { data: userProfile, error: userError } = await supabase
+        .from('users')
+        .select('store_id')
+        .eq('auth_user_id', user.id)
+        .single();
+      
+      if (userError || !userProfile?.store_id) {
+        console.error('Store ID not found');
+        return;
+      }
+      
       try {
         let query = supabase
           .from('orders')
@@ -29,6 +45,7 @@ export default function OrdersPage() {
             *,
             customers:customer_id (first_name, last_name)
           `)
+          .eq('store_id', userProfile.store_id)
           .order('created_at', { ascending: false });
 
         // Apply date range filter if specified
