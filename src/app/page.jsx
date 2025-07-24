@@ -60,13 +60,13 @@ export default function Dashboard() {
           .order('created_at', { ascending: false })
           .limit(5)
       ]);
-      console.log("revenueData", revenueData)
-      console.log("salesCount", salesCount)
-      console.log("customersCount", customersCount)
-      console.log("avgOrderData", avgOrderData)
-      console.log("monthlySales", monthlySales)
-      console.log("inventoryStats", inventoryStats)
-      console.log("recentOrders", recentOrders)
+      //console.log("revenueData", revenueData)
+      //console.log("salesCount", salesCount)
+      //console.log("customersCount", customersCount)
+      //console.log("avgOrderData", avgOrderData)
+      //console.log("monthlySales", monthlySales)
+      //console.log("inventoryStats", inventoryStats)
+      //console.log("recentOrders", recentOrders)
 
       setMetrics([
         { 
