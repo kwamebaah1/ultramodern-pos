@@ -2,7 +2,7 @@
 
 import { FiShoppingBag, FiDollarSign, FiCalendar, FiUsers } from 'react-icons/fi';
 
-export function CustomerActivityTable({ data }) {
+export function CustomerActivityTable({ data, currency }) {
   return (
     <div className="space-y-4">
       {data.map((customer, index) => (
@@ -25,8 +25,7 @@ export function CustomerActivityTable({ data }) {
             <span>{customer.total_orders} order(s)</span>
           </div>
           <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-300">
-            <FiDollarSign className="h-4 w-4" />
-            <span>{customer.total_spent.toFixed(2)}</span>
+            <span>{currency}{customer.total_spent.toFixed(2)}</span>
           </div>
           <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-300">
             <FiCalendar className="h-4 w-4" />
