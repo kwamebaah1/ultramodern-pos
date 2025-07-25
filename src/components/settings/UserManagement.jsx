@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { toast } from 'react-hot-toast';
-import { FiUserPlus, FiEdit2, FiTrash2, FiUser, FiLock } from 'react-icons/fi';
+import { FiUserPlus, FiEdit2, FiTrash2, FiUser, FiLock, FiCopy, FiCheck } from 'react-icons/fi';
 
 const ROLES = [
   { value: 'cashier', label: 'Cashier' },
@@ -17,6 +17,9 @@ export default function UserManagement({ storeId }) {
   const [isLoading, setIsLoading] = useState(true);
   const [showUserForm, setShowUserForm] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
+  const [generatedPassword, setGeneratedPassword] = useState('');
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     first_name: '',
@@ -57,7 +60,7 @@ export default function UserManagement({ storeId }) {
   const handleCreateUser = async (e) => {
     e.preventDefault();
     
-    // Check user limit (3 cashiers max)
+    // Check user limit
     const cashierCount = users.filter(u => u.role === 'cashier').length;
     if (formData.role === 'cashier' && cashierCount >= 3) {
       toast.error('You can only have up to 3 cashier accounts');
@@ -66,12 +69,12 @@ export default function UserManagement({ storeId }) {
     
     try {
       setIsLoading(true);
+      const password = generateRandomPassword();
+      setGeneratedPassword(password); // Store the generated password
       
-      // First create auth user
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
-        password: generateRandomPassword(),
-        email_confirm: true,
+        password: password,
       });
       
       if (authError) throw authError;
@@ -100,14 +103,21 @@ export default function UserManagement({ storeId }) {
         last_name: '',
         role: 'cashier',
       });
-      
-      toast.success('User created successfully');
+
+      toast.success('User created successfully. They must confirm their email before logging in.');
+      setShowPasswordModal(true);
     } catch (error) {
       console.error('Error creating user:', error);
       toast.error(error.message || 'Failed to create user');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(generatedPassword);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleUpdateUser = async (e) => {
@@ -181,7 +191,7 @@ export default function UserManagement({ storeId }) {
   };
 
   const generateRandomPassword = () => {
-    return Math.random().toString(36).slice(-10) + 'A1!'; // Ensure it meets password requirements
+    return Math.random().toString(36).slice(-10) + 'A1!';
   };
 
   return (
@@ -404,6 +414,67 @@ export default function UserManagement({ storeId }) {
                   </Button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
+            <div className="p-6">
+              <h3 className="text-lg font-medium mb-4">User Created Successfully</h3>
+              
+              <div className="mb-4">
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                  Here are the login credentials for the new user:
+                </p>
+                
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Email</p>
+                    <p className="text-sm mt-1">{formData.email}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Password</p>
+                    <div className="flex items-center mt-1">
+                      <code className="bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded-md text-sm font-mono flex-1">
+                        {generatedPassword}
+                      </code>
+                      <button
+                        onClick={copyToClipboard}
+                        className="ml-2 p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                        title="Copy to clipboard"
+                      >
+                        {copied ? (
+                          <FiCheck className="h-5 w-5 text-green-500" />
+                        ) : (
+                          <FiCopy className="h-5 w-5" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 dark:border-yellow-600 p-4 mb-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <FiLock className="h-5 w-5 text-yellow-400 dark:text-yellow-300" />
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                      The user must confirm their email before logging in. Please provide them with these credentials securely.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex justify-end">
+                <Button onClick={() => setShowPasswordModal(false)}>
+                  Close
+                </Button>
+              </div>
             </div>
           </div>
         </div>
