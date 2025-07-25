@@ -5,7 +5,8 @@ import { supabase } from '@/lib/supabase/client';
 import StoreSettings from '@/components/settings/StoreSettings';
 import UserManagement from '@/components/settings/UserManagement';
 import EmailMarketing from '@/components/settings/EmailMarketing';
-import { FiSettings, FiUsers, FiMail } from 'react-icons/fi';
+import PasswordSettings from '@/components/settings/PasswordSettings';
+import { FiSettings, FiUsers, FiMail, FiKey } from 'react-icons/fi';
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('store');
@@ -78,6 +79,17 @@ export default function SettingsPage() {
             <FiSettings /> Store Settings
           </button>
           
+          <button
+            onClick={() => setActiveTab('password')}
+            className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+              activeTab === 'password'
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:hover:text-gray-300'
+            }`}
+          >
+            <FiKey /> Password
+          </button>
+          
           {userRole === 'owner' && (
             <>
               <button
@@ -107,8 +119,9 @@ export default function SettingsPage() {
       </div>
 
       {/* Tab Content */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden p-6">
         {activeTab === 'store' && <StoreSettings storeData={storeData} />}
+        {activeTab === 'password' && <PasswordSettings />}
         {activeTab === 'users' && userRole === 'owner' && <UserManagement storeId={storeData?.id} />}
         {activeTab === 'email' && userRole === 'owner' && <EmailMarketing storeId={storeData?.id} />}
       </div>
