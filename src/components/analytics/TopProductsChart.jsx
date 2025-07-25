@@ -20,7 +20,7 @@ ChartJS.register(
   Legend
 );
 
-export function TopProductsChart({ data }) {
+export function TopProductsChart({ data, currency }) {
   const options = {
     responsive: true,
     maintainAspectRatio: false,
@@ -40,7 +40,7 @@ export function TopProductsChart({ data }) {
         },
         callbacks: {
           label: (context) => {
-            return ` $${context.raw.toFixed(2)}`;
+            return ` ${currency}${context.raw.toFixed(2)}`;
           }
         },
         displayColors: false,
@@ -55,7 +55,7 @@ export function TopProductsChart({ data }) {
           drawBorder: false,
         },
         ticks: {
-          callback: (value) => `$${value}`,
+          callback: (value) => `${currency}${value}`,
           font: {
             size: 12
           }
