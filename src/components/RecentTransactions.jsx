@@ -2,7 +2,7 @@
 
 import { FiArrowUpRight, FiArrowDownRight } from 'react-icons/fi';
 
-export function RecentTransactions({ transactions }) {
+export function RecentTransactions({ transactions, currency }) {
   if (transactions.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-40 text-gray-500">
@@ -45,7 +45,7 @@ export function RecentTransactions({ transactions }) {
           </div>
           <div className="text-right">
             <p className="font-medium text-gray-900 dark:text-white">
-              GH₵{transaction.amount.toFixed(2)}
+              {currency}{transaction.amount.toFixed(2)}
             </p>
             <p className={`text-xs ${
               transaction.status === 'completed' ? 'text-green-600 dark:text-green-400' :

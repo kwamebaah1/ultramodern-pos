@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FiTrendingUp, FiDollarSign, FiShoppingBag, FiUsers, FiArrowUpRight, FiArrowDownRight, FiRefreshCw } from 'react-icons/fi';
+import { FiTrendingUp, FiDollarSign, FiShoppingBag, FiUsers, FiRefreshCw } from 'react-icons/fi';
 import { Card } from '@/components/ui/Card';
 import { SalesChart } from '@/components/charts/SalesChart';
 import { InventoryStatus } from '@/components/charts/InventoryStatus';
 import { RecentTransactions } from '@/components/RecentTransactions';
 import { supabase } from '@/lib/supabase/client';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { CURRENCIES } from '@/components/currencies/Currency';
 
 export default function Dashboard() {
   const [metrics, setMetrics] = useState(null);
@@ -16,6 +17,7 @@ export default function Dashboard() {
   const [transactions, setTransactions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [currency, setCurrency] = useState({ symbol: 'GH₵' });
 
   const fetchDashboardData = async () => {
     setIsLoading(true);
@@ -31,6 +33,15 @@ export default function Dashboard() {
       if (!userData?.store_id) throw new Error('No store associated with user');
 
       const storeId = userData.store_id;
+
+      const { data: storeData } = await supabase
+        .from('stores')
+        .select('currency')
+        .eq('id', storeId)
+        .single();
+
+      const currentCurrency = CURRENCIES.find(c => c.code === (storeData?.currency || 'GHS'));
+      setCurrency(currentCurrency || CURRENCIES.find(c => c.code === 'GHS'));
 
       const [
         { data: revenueData },
@@ -60,18 +71,11 @@ export default function Dashboard() {
           .order('created_at', { ascending: false })
           .limit(5)
       ]);
-      //console.log("revenueData", revenueData)
-      //console.log("salesCount", salesCount)
-      //console.log("customersCount", customersCount)
-      //console.log("avgOrderData", avgOrderData)
-      //console.log("monthlySales", monthlySales)
-      //console.log("inventoryStats", inventoryStats)
-      //console.log("recentOrders", recentOrders)
 
       setMetrics([
         { 
           title: 'Total Revenue', 
-          value: `GH₵${revenueData[0]?.total_revenue?.toFixed(2) || '0.00'}`, 
+          value: `${currency.symbol}${revenueData[0]?.total_revenue?.toFixed(2) || '0.00'}`, 
           change: `${revenueData[0]?.change_percentage >= 0 ? '+' : ''}${revenueData[0]?.change_percentage || 0}%`, 
           icon: FiDollarSign 
         },
@@ -89,7 +93,7 @@ export default function Dashboard() {
         },
         { 
           title: 'Avg. Order Value', 
-          value: `GH₵${avgOrderData[0]?.avg_order_value?.toFixed(2) || '0.00'}`, 
+          value: `${currency.symbol}${avgOrderData[0]?.avg_order_value?.toFixed(2) || '0.00'}`, 
           change: `${avgOrderData[0]?.change_percentage >= 0 ? '+' : ''}${avgOrderData[0]?.change_percentage || 0}%`, 
           icon: FiTrendingUp 
         },
@@ -281,7 +285,7 @@ export default function Dashboard() {
                 ))}
               </div>
             ) : (
-              <RecentTransactions transactions={transactions} />
+              <RecentTransactions transactions={transactions} currency={currency.symbol}/>
             )}
           </div>
         </Card>
