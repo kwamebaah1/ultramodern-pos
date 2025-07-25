@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/Button';
 import { AdvancedImage } from '@cloudinary/react';
 import { getCloudinaryImage } from '@/lib/cloudinary';
+import { CURRENCIES } from '@/components/currencies/Currency';
 
 export default function OrderReceipt({ params }) {
   const unwrappedParams = use(params);
@@ -15,12 +16,45 @@ export default function OrderReceipt({ params }) {
   const [items, setItems] = useState([]);
   const [customer, setCustomer] = useState(null);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [currency, setCurrency] = useState({ symbol: 'GH₵' });
   const router = useRouter();
 
   const orderid = id;
 
   useEffect(() => {
     const fetchOrderData = async () => {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        console.error('User not found:', userError);
+        return;
+      }
+      
+      const { data: profile, error: profileError } = await supabase
+        .from('users')
+        .select('store_id')
+        .eq('auth_user_id', user.id)
+        .single();
+      
+      if (profileError || !profile?.store_id) {
+        console.error('Failed to fetch store_id:', profileError);
+        return;
+      }
+      
+      const storeId = profile.store_id;
+      
+      const { data: storeData } = await supabase
+        .from('stores')
+        .select('currency')
+        .eq('id', storeId)
+        .single();
+      
+      const currentCurrency = CURRENCIES.find(c => c.code === (storeData?.currency || 'GHS'));
+      setCurrency(currentCurrency || CURRENCIES.find(c => c.code === 'GHS'));
+
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .select('*')
@@ -217,10 +251,10 @@ export default function OrderReceipt({ params }) {
                   )}
                   <div className="flex-1">
                     <h3 className="font-medium print:text-sm">{item.products?.name || 'Product'}</h3>
-                    <p className="text-sm text-gray-500 print:text-xs">${item.unit_price.toFixed(2)} × {item.quantity}</p>
+                    <p className="text-sm text-gray-500 print:text-xs">{currency.symbol}{item.unit_price.toFixed(2)} × {item.quantity}</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium print:text-sm">${item.total_price.toFixed(2)}</p>
+                    <p className="font-medium print:text-sm">{currency.symbol}{item.total_price.toFixed(2)}</p>
                   </div>
                 </div>
               );
@@ -233,15 +267,15 @@ export default function OrderReceipt({ params }) {
           <div className="space-y-2 print:space-y-1">
             <div className="flex justify-between">
               <span className="text-gray-600 print:text-sm">Subtotal:</span>
-              <span className="font-medium print:text-sm">${order.subtotal.toFixed(2)}</span>
+              <span className="font-medium print:text-sm">{currency.symbol}{order.subtotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600 print:text-sm">Tax ({order.tax_amount > 0 ? (order.tax_amount / order.subtotal * 100).toFixed(0) : 0}%):</span>
-              <span className="font-medium print:text-sm">${order.tax_amount.toFixed(2)}</span>
+              <span className="font-medium print:text-sm">{currency.symbol}{order.tax_amount.toFixed(2)}</span>
             </div>
             <div className="flex justify-between pt-2 border-t border-gray-200 print:pt-1 print:border-t-2">
               <span className="font-semibold print:text-sm">Total:</span>
-              <span className="font-bold text-lg print:text-base">${order.total.toFixed(2)}</span>
+              <span className="font-bold text-lg print:text-base">{currency.symbol}{order.total.toFixed(2)}</span>
             </div>
           </div>
         </div>
