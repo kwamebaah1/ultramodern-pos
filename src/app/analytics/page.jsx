@@ -21,6 +21,7 @@ import { TopProductsChart } from '@/components/analytics/TopProductsChart';
 import { CustomerActivityTable } from '@/components/analytics/CustomerActivityTable';
 import { supabase } from '@/lib/supabase/client';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { CURRENCIES } from '@/components/currencies/Currency';
 
 export default function AnalyticsPage() {
   const [dateRange, setDateRange] = useState({
@@ -28,6 +29,7 @@ export default function AnalyticsPage() {
     end: new Date()
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [currency, setCurrency] = useState({ symbol: 'GH₵' });
   const [data, setData] = useState({
     metrics: null,
     salesTrend: null,
@@ -57,6 +59,15 @@ export default function AnalyticsPage() {
         .single();
 
       const storeId = profile.store_id;
+
+      const { data: storeData } = await supabase
+        .from('stores')
+        .select('currency')
+        .eq('id', storeId)
+        .single();
+            
+      const currentCurrency = CURRENCIES.find(c => c.code === (storeData?.currency || 'GHS'));
+      setCurrency(currentCurrency || CURRENCIES.find(c => c.code === 'GHS'));
     
       const [
         { data: metrics },
@@ -150,7 +161,7 @@ export default function AnalyticsPage() {
           <>
             <MetricCard
               title="Total Revenue"
-              value={`$${data.metrics[0].total_revenue.toFixed(2)}`}
+              value={`${currency.symbol}${data.metrics[0].total_revenue.toFixed(2)}`}
               change={data.metrics[0].revenue_change}
               icon={FiDollarSign}
               trend="up"
@@ -171,7 +182,7 @@ export default function AnalyticsPage() {
             />
             <MetricCard
               title="Avg. Order Value"
-              value={`$${data.metrics[0].avg_order_value.toFixed(2)}`}
+              value={`${currency.symbol}${data.metrics[0].avg_order_value.toFixed(2)}`}
               change={data.metrics[0].aov_change}
               icon={FiTrendingUp}
               trend="up"
@@ -206,7 +217,7 @@ export default function AnalyticsPage() {
                 {isLoading ? (
                   <Skeleton className="h-full w-full" />
                 ) : data.salesTrend ? (
-                  <SalesTrendChart data={data.salesTrend} />
+                  <SalesTrendChart data={data.salesTrend}  currency={currency.symbol}/>
                 ) : (
                   <div className="h-full flex flex-col items-center justify-center text-gray-500 dark:text-gray-400">
                     <FiBarChart2 className="h-12 w-12 mb-4" />
@@ -255,7 +266,7 @@ export default function AnalyticsPage() {
                 {isLoading ? (
                   <Skeleton className="h-full w-full" />
                 ) : data.topProducts ? (
-                  <TopProductsChart data={data.topProducts} />
+                  <TopProductsChart data={data.topProducts} currency={currency.symbol}/>
                 ) : (
                   <div className="h-full flex flex-col items-center justify-center text-gray-500 dark:text-gray-400">
                     <FiShoppingCart className="h-12 w-12 mb-4" />
@@ -282,7 +293,7 @@ export default function AnalyticsPage() {
                     ))}
                   </div>
                 ) : data.customerActivity ? (
-                  <CustomerActivityTable data={data.customerActivity} />
+                  <CustomerActivityTable data={data.customerActivity} currency={currency.symbol}/>
                 ) : (
                   <div className="h-full flex flex-col items-center justify-center text-gray-500 dark:text-gray-400">
                     <FiUsers className="h-12 w-12 mb-4" />
