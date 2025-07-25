@@ -21,9 +21,29 @@ export default function CustomerFormModal({ initialSearch, onSuccess, onClose })
     setIsSubmitting(true);
 
     try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) throw userError;
+
+      const { data: profile, error: profileError } = await supabase
+        .from('users')
+        .select('store_id')
+        .eq('auth_user_id', user.id)
+        .single();
+
+      if (profileError || !profile?.store_id) throw profileError;
+
+      const fullCustomerData = {
+        ...formData,
+        store_id: profile.store_id,
+      };
+
       const { data, error } = await supabase
         .from('customers')
-        .insert(formData)
+        .insert(fullCustomerData)
         .select()
         .single();
 
