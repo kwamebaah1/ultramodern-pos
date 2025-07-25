@@ -9,6 +9,7 @@ import { DataTable } from '@/components/ui/DataTable';
 import { ProductForm } from '@/components/products/ProductForm';
 import { useToast } from '@/components/ui/Toast';
 import { exportToCSV } from '@/lib/utils';
+import { CURRENCIES } from '@/components/currencies/Currency';
 
 export default function ProductsPage() {
   const [products, setProducts] = useState([]);
@@ -18,6 +19,7 @@ export default function ProductsPage() {
   const [currentProduct, setCurrentProduct] = useState(null);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [currency, setCurrency] = useState({ symbol: 'GH₵' });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -40,6 +42,17 @@ export default function ProductsPage() {
       console.error('Store ID not found');
       return;
     }
+
+    const storeId = userProfile.store_id;
+
+    const { data: storeData } = await supabase
+      .from('stores')
+      .select('currency')
+      .eq('id', storeId)
+      .single();
+            
+    const currentCurrency = CURRENCIES.find(c => c.code === (storeData?.currency || 'GHS'));
+    setCurrency(currentCurrency || CURRENCIES.find(c => c.code === 'GHS'));
 
     const { data, error } = await supabase
       .from('products')
@@ -150,7 +163,7 @@ export default function ProductsPage() {
     {
       accessorKey: 'price',
       header: 'Price',
-      cell: ({ row }) => `$${row.original.price.toFixed(2)}`,
+      cell: ({ row }) => `${currency.symbol}${row.original.price.toFixed(2)}`,
     },
     {
       accessorKey: 'stock_quantity',
