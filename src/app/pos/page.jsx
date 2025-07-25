@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FiSearch, FiPlus, FiMinus, FiTrash2, FiPrinter, FiCreditCard, FiUser, FiDollarSign } from 'react-icons/fi';
+import { FiSearch, FiPlus, FiMinus, FiTrash2, FiCreditCard, FiDollarSign } from 'react-icons/fi';
 import { supabase } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -10,6 +10,7 @@ import { AdvancedImage } from '@cloudinary/react';
 import { getCloudinaryImage } from '@/lib/cloudinary';
 import CustomerSelect from '@/components/customers/CustomerSelect';
 import CustomerFormModal from '@/components/customers/CustomerFormModal.';
+import { CURRENCIES } from '@/components/currencies/Currency';
 import toast from 'react-hot-toast';
 
 export default function PosPage() {
@@ -21,6 +22,7 @@ export default function PosPage() {
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+  const [currency, setCurrency] = useState({ symbol: 'GH₵' });
   const router = useRouter();
 
   // Fetch products
@@ -47,6 +49,15 @@ export default function PosPage() {
       }
 
       const storeId = profile.store_id;
+
+      const { data: storeData } = await supabase
+        .from('stores')
+        .select('currency')
+        .eq('id', storeId)
+        .single();
+
+      const currentCurrency = CURRENCIES.find(c => c.code === (storeData?.currency || 'GHS'));
+      setCurrency(currentCurrency || CURRENCIES.find(c => c.code === 'GHS'));
 
       const { data, error } = await supabase
         .from('products')
@@ -206,6 +217,10 @@ export default function PosPage() {
     }
   };
 
+  const formatCurrency = (amount) => {
+    return `${currency.symbol}${parseFloat(amount || 0).toFixed(2)}`;
+  };
+
   return (
     <div className="flex h-full">
       {showCustomerModal && (
@@ -233,6 +248,7 @@ export default function PosPage() {
             <ProductCard
               key={product.id}
               product={product}
+              currencySymbol={currency.symbol}
               onAdd={() => addToCart(product)}
             />
           ))}
@@ -283,6 +299,7 @@ export default function PosPage() {
                 <CartItem
                   key={item.id}
                   item={item}
+                  currencySymbol={currency.symbol}
                   onRemove={() => removeFromCart(item.id)}
                   onQuantityChange={(qty) => updateQuantity(item.id, qty)}
                 />
@@ -295,11 +312,11 @@ export default function PosPage() {
           <div className="space-y-2 mb-4">
             <div className="flex justify-between">
               <span>Subtotal:</span>
-              <span>${subtotal.toFixed(2)}</span>
+              <span>{formatCurrency(subtotal)}</span>
             </div>
             <div className="flex justify-between">
               <span>Tax (10%):</span>
-              <span>${tax.toFixed(2)}</span>
+              <span>{formatCurrency(tax)}</span>
             </div>
             {customer?.loyalty_points !== undefined && (
               <div className="flex justify-between text-blue-600 dark:text-blue-400">
@@ -309,7 +326,7 @@ export default function PosPage() {
             )}
             <div className="flex justify-between font-bold text-lg">
               <span>Total:</span>
-              <span>${total.toFixed(2)}</span>
+              <span>{formatCurrency(total)}</span>
             </div>
           </div>
 
@@ -336,7 +353,7 @@ export default function PosPage() {
 }
 
 // Product Card Component
-function ProductCard({ product, onAdd }) {
+function ProductCard({ product, currencySymbol, onAdd }) {
     const productImage = product.image_public_id 
       ? getCloudinaryImage(product.image_public_id, [
           'c_fill', 'w_300', 'h_300', 'q_auto'
@@ -363,7 +380,7 @@ function ProductCard({ product, onAdd }) {
           <h3 className="font-medium truncate">{product.name}</h3>
           <p className="text-gray-500 text-sm truncate mb-2">{product.description}</p>
           <div className="flex justify-between items-center mt-auto">
-            <span className="font-bold">${product.price.toFixed(2)}</span>
+            <span className="font-bold">{currencySymbol}{product.price.toFixed(2)}</span>
             <span className={`text-xs px-2 py-1 rounded-full ${
               product.stock_quantity > 5 
                 ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
@@ -378,12 +395,12 @@ function ProductCard({ product, onAdd }) {
 }
 
 // Cart Item Component
-function CartItem({ item, onRemove, onQuantityChange }) {
+function CartItem({ item, currencySymbol, onRemove, onQuantityChange }) {
   return (
     <li className="flex items-center justify-between p-2 border-b border-gray-100 dark:border-gray-700">
       <div className="flex-1">
         <h4 className="font-medium">{item.name}</h4>
-        <p className="text-sm text-gray-500">${item.price.toFixed(2)} each</p>
+        <p className="text-sm text-gray-500">{currencySymbol}{item.price.toFixed(2)} each</p>
       </div>
       <div className="flex items-center space-x-2">
         <button 
@@ -401,7 +418,7 @@ function CartItem({ item, onRemove, onQuantityChange }) {
         </button>
       </div>
       <div className="ml-4 font-medium">
-        ${(item.price * item.quantity).toFixed(2)}
+        {currencySymbol}{(item.price * item.quantity).toFixed(2)}
       </div>
       <button 
         onClick={onRemove}
