@@ -7,12 +7,14 @@ import { supabase } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { formatDate, formatTime } from '@/lib/utils/date';
+import { CURRENCIES } from '@/components/currencies/Currency';
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [currency, setCurrency] = useState({ symbol: 'GH₵' });
   const [dateRange, setDateRange] = useState({
     start: new Date(new Date().setDate(new Date().getDate() - 7)).toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
@@ -37,6 +39,17 @@ export default function OrdersPage() {
         console.error('Store ID not found');
         return;
       }
+
+      const storeId = userProfile.store_id;
+      
+      const { data: storeData } = await supabase
+        .from('stores')
+        .select('currency')
+        .eq('id', storeId)
+        .single();
+                  
+      const currentCurrency = CURRENCIES.find(c => c.code === (storeData?.currency || 'GHS'));
+      setCurrency(currentCurrency || CURRENCIES.find(c => c.code === 'GHS'));
       
       try {
         let query = supabase
@@ -213,9 +226,8 @@ export default function OrdersPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-1">
-                        <FiDollarSign className="h-4 w-4 text-green-500" />
                         <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                          {order.total.toFixed(2)}
+                          <span className="text-green-500">{currency.symbol}</span>{order.total.toFixed(2)}
                         </span>
                       </div>
                     </td>
