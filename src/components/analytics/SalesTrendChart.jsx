@@ -24,7 +24,7 @@ ChartJS.register(
   Filler
 );
 
-export function SalesTrendChart({ data }) {
+export function SalesTrendChart({ data, currency }) {
   const options = {
     responsive: true,
     maintainAspectRatio: false,
@@ -43,7 +43,7 @@ export function SalesTrendChart({ data }) {
         },
         callbacks: {
           label: (context) => {
-            return ` $${context.raw.toFixed(2)}`;
+            return ` ${currency}${context.raw.toFixed(2)}`;
           }
         },
         displayColors: false,
@@ -59,7 +59,7 @@ export function SalesTrendChart({ data }) {
           drawBorder: false,
         },
         ticks: {
-          callback: (value) => `$${value}`,
+          callback: (value) => `${currency}${value}`,
           font: {
             size: 12
           }
