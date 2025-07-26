@@ -241,7 +241,7 @@ export default function Dashboard() {
                 {isLoading ? (
                   <Skeleton className="h-full w-full" />
                 ) : salesData ? (
-                  <SalesChart data={salesData} />
+                  <SalesChart data={salesData}  currency={currency.symbol} />
                 ) : (
                   <div className="h-full flex flex-col items-center justify-center text-gray-500">
                     <FiShoppingBag className="h-12 w-12 mb-2" />
