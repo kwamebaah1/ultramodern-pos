@@ -2,18 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { 
-  FiTrendingUp, 
-  FiDollarSign, 
-  FiShoppingBag, 
-  FiUsers,
-  FiRefreshCw,
-  FiCalendar,
-  FiPieChart,
-  FiBarChart2,
-  FiShoppingCart,
-  FiLock,
-  FiCheckCircle,
-  FiArrowUpRight
+  FiTrendingUp, FiDollarSign, FiShoppingBag, 
+  FiUsers, FiRefreshCw, FiCalendar,
+  FiPieChart, FiBarChart2, FiShoppingCart,
+  FiLock, FiCheckCircle, FiArrowUpRight
 } from 'react-icons/fi';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
