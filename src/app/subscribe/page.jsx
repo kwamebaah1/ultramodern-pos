@@ -19,26 +19,31 @@ function SubscribeContent() {
     {
       id: 'basic',
       name: 'Basic Plan',
-      price: 10000, // 100 GHS in kobo
+      price: 15000, // 150 GHS in kobo
       description: 'Essential features for small businesses',
       features: ['Up to 3 registers', 'Basic reporting', 'Email support']
     },
     {
       id: 'pro',
       name: 'Pro Plan',
-      price: 25000, // 250 GHS in kobo
+      price: 30000, // 300 GHS in kobo
       description: 'Advanced features for growing businesses',
-      features: ['Unlimited registers', 'Advanced analytics', 'Priority support'],
+      features: ['Up to 5 registers', 'Advanced analytics', 'Priority support'],
       recommended: true
     },
     {
       id: 'enterprise',
       name: 'Enterprise',
-      price: 50000, // 500 GHS in kobo
+      price: 55000, // 550 GHS in kobo
       description: 'Custom solutions for large businesses',
-      features: ['Dedicated account manager', 'Custom integrations', '24/7 support']
+      features: [
+        'Unlimited registers',
+        'Email marketing',
+        'Custom integrations',
+      ]
     }
   ]);
+
   const [selectedPlan, setSelectedPlan] = useState('pro');
 
   useEffect(() => {
