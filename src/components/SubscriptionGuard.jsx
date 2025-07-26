@@ -41,7 +41,7 @@ export default function SubscriptionGuard({ children }) {
       // Get store subscription status
       const { data: storeData, error: storeError } = await supabase
         .from('stores')
-        .select('subscription_status, current_period_end, billing_enabled')
+        .select('subscription_status, trial_ends_at, billing_enabled, current_period_end')
         .eq('id', userData.store_id)
         .single();
 
@@ -50,10 +50,18 @@ export default function SubscriptionGuard({ children }) {
         return;
       }
 
-      // Redirect to subscription page if not active
+      const now = new Date();
+      const trialEndsAt = new Date(storeData.trial_ends_at);
+      const periodEnd = storeData.current_period_end ? new Date(storeData.current_period_end) : null;
+
+      // Redirect to subscription page only if:
+      // 1. Billing is enabled AND
+      // 2. Trial has ended (trial_ends_at is in the past) AND
+      // 3. Subscription is not active OR period has ended
       if (storeData.billing_enabled && 
+          trialEndsAt < now && 
           (storeData.subscription_status !== 'active' || 
-           new Date(storeData.current_period_end) < new Date())) {
+           (periodEnd && periodEnd < now))) {
         router.push(`/subscribe?store_id=${userData.store_id}`);
       }
     };
