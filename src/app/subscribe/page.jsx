@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import toast from 'react-hot-toast';
 import { FiLoader, FiCheckCircle, FiXCircle, FiArrowRight } from 'react-icons/fi';
 
-export default function SubscribePage() {
+function SubscribeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const storeId = searchParams.get('store_id');
@@ -226,5 +226,17 @@ export default function SubscribePage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function SubscribePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
+      </div>
+    }>
+      <SubscribeContent />
+    </Suspense>
   );
 }
