@@ -10,9 +10,13 @@ import {
   FiCalendar,
   FiPieChart,
   FiBarChart2,
-  FiShoppingCart
+  FiShoppingCart,
+  FiLock,
+  FiCheckCircle,
+  FiArrowUpRight
 } from 'react-icons/fi';
 import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
 import { DateRangePicker } from '@/components/ui/DateRangePicker';
 import { MetricCard } from '@/components/analytics/MetricCard';
 import { SalesTrendChart } from '@/components/analytics/SalesTrendChart';
@@ -37,6 +41,108 @@ export default function AnalyticsPage() {
     topProducts: null,
     customerActivity: null
   });
+  const [storePlan, setStorePlan] = useState(null);
+
+  useEffect(() => {
+    const checkPlanAndFetchData = async () => {
+      setIsLoading(true);
+      
+      try {
+        // First get user and store info
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) {
+          console.error('User not found:', userError);
+          setIsLoading(false);
+          return;
+        }
+
+        // Get store plan first
+        const { data: userData } = await supabase
+          .from('users')
+          .select('store_id')
+          .eq('auth_user_id', user.id)
+          .single();
+
+        if (!userData) {
+          setIsLoading(false);
+          return;
+        }
+
+        const { data: storeData } = await supabase
+          .from('stores')
+          .select('plan, currency')
+          .eq('id', userData.store_id)
+          .single();
+
+        setStorePlan(storeData?.plan || null);
+        
+        // If basic plan, stop here
+        if (storeData?.plan === 'basic') {
+          setIsLoading(false);
+          return;
+        }
+
+        const storeId = userData.store_id;
+
+        // Only proceed with analytics fetch for non-basic plans
+        const currentCurrency = CURRENCIES.find(c => c.code === (storeData?.currency || 'GHS'));
+        setCurrency(currentCurrency || CURRENCIES.find(c => c.code === 'GHS'));
+      
+        const [
+          { data: metrics },
+          { data: salesTrend },
+          { data: revenueBreakdown },
+          { data: topProducts },
+          { data: customerActivity }
+        ] = await Promise.all([
+          supabase.rpc('get_analytics_metrics', {
+            start_date: dateRange.start.toISOString(),
+            end_date: dateRange.end.toISOString(),
+            p_store_id: storeId
+          }),
+          supabase.rpc('get_sales_trend', {
+            start_date: dateRange.start.toISOString(),
+            end_date: dateRange.end.toISOString(),
+            p_store_id: storeId
+          }),
+          supabase.rpc('get_revenue_breakdown', {
+            start_date: dateRange.start.toISOString(),
+            end_date: dateRange.end.toISOString(),
+            p_store_id: storeId
+          }),
+          supabase.rpc('get_top_products', {
+            start_date: dateRange.start.toISOString(),
+            end_date: dateRange.end.toISOString(),
+            limit_num: 5,
+            p_store_id: storeId
+          }),
+          supabase.rpc('get_customer_activity', {
+            start_date: dateRange.start.toISOString(),
+            end_date: dateRange.end.toISOString(),
+            limit_num: 5,
+            p_store_id: storeId
+          })
+        ]);
+
+        console.log("revenueBreakdown", revenueBreakdown)
+        console.log("customerActivity", customerActivity)
+
+        setData({
+          metrics,
+          salesTrend,
+          revenueBreakdown,
+          topProducts,
+          customerActivity
+        });
+      } catch (error) {
+        console.error('Error:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkPlanAndFetchData();
+  }, [dateRange]);
 
   const fetchAnalyticsData = async () => {
     setIsLoading(true);
@@ -125,6 +231,56 @@ export default function AnalyticsPage() {
   useEffect(() => {
     fetchAnalyticsData();
   }, [dateRange]);
+
+  if (isLoading) {
+    return (
+      <div className="p-6 space-y-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
+        {/* Loading skeletons */}
+        <Skeleton className="h-12 w-1/3 mb-6" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {Array(4).fill(0).map((_, i) => (
+            <Skeleton key={i} className="h-36 rounded-xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (storePlan === 'basic') {
+    return (
+      <div className="p-6 flex flex-col items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="max-w-md text-center">
+          <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-indigo-100 dark:bg-indigo-900/30 mb-6">
+            <FiLock className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+            Advanced Analytics Locked
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mb-8">
+            Upgrade to our Pro or Enterprise plan to unlock powerful analytics features.
+          </p>
+          <div className="space-y-4 mb-8">
+            {[
+              "Sales trends and revenue analytics",
+              "Customer behavior insights",
+              "Product performance metrics"
+            ].map((feature) => (
+              <div key={feature} className="flex items-start">
+                <FiCheckCircle className="flex-shrink-0 h-5 w-5 text-green-500 mt-0.5 mr-3" />
+                <span className="text-left">{feature}</span>
+              </div>
+            ))}
+          </div>
+          <Button
+            onClick={() => router.push('/subscribe')}
+            className="w-full max-w-xs"
+          >
+            Upgrade Now <FiArrowUpRight className="ml-2" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
