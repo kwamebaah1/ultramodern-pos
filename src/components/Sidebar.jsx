@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -25,7 +25,7 @@ export default function Sidebar() {
   const { theme, setTheme } = useTheme();
 
   return (
-    <div className="hidden md:flex md:w-64 md:flex-col border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+    <div className="hidden md:flex md:flex-col md:w-64 md:fixed md:inset-y-0 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
       <div className="flex flex-col h-full pt-5 pb-4">
         <div className="flex items-center justify-left mb-8 px-4">
           <FiShoppingBag className="h-7 w-7 text-blue-600 mr-2" />
