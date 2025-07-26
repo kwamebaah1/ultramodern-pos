@@ -54,14 +54,13 @@ export default function SubscriptionGuard({ children }) {
       const trialEndsAt = new Date(storeData.trial_ends_at);
       const periodEnd = storeData.current_period_end ? new Date(storeData.current_period_end) : null;
 
-      // Redirect to subscription page only if:
-      // 1. Billing is enabled AND
-      // 2. Trial has ended (trial_ends_at is in the past) AND
-      // 3. Subscription is not active OR period has ended
-      if (storeData.billing_enabled && 
-          trialEndsAt < now && 
-          (storeData.subscription_status !== 'active' || 
-           (periodEnd && periodEnd < now))) {
+      // Determine if we should show subscription page
+      const shouldShowSubscriptionPage = 
+        storeData.billing_enabled && // Billing is enabled
+        trialEndsAt < now && // Trial period has ended
+        storeData.subscription_status !== 'active'; // Subscription is not active
+
+      if (shouldShowSubscriptionPage) {
         router.push(`/subscribe?store_id=${userData.store_id}`);
       }
     };
