@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FiSearch, FiPlus, FiMinus, FiTrash2, FiCreditCard, FiDollarSign } from 'react-icons/fi';
+import { FiSearch, FiPlus, FiMinus, FiTrash2, FiCreditCard, FiDollarSign, FiShoppingCart, FiX } from 'react-icons/fi';
 import { supabase } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -23,12 +23,14 @@ export default function PosPage() {
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
   const [currency, setCurrency] = useState({ symbol: 'GH₵' });
+  const [isCartOpen, setIsCartOpen] = useState(false);
   const router = useRouter();
 
   // Fetch products
   useEffect(() => {
-    const fetchProducts = async () => {const {
-      data: { user },
+    const fetchProducts = async () => {
+      const {
+        data: { user },
         error: userError,
       } = await supabase.auth.getUser();
 
@@ -108,6 +110,11 @@ export default function PosPage() {
         return [...prevCart, { ...product, quantity: 1 }];
       }
     });
+    
+    // On mobile, show cart after adding an item
+    if (window.innerWidth < 768) {
+      setIsCartOpen(true);
+    }
   };
 
   const removeFromCart = (productId) => {
@@ -209,6 +216,7 @@ export default function PosPage() {
       }
 
       setCart([]);
+      setIsCartOpen(false);
       toast.success('Order placed successfully!');
       router.push(`/orders/${order.id}`);
     } catch (error) {
@@ -221,8 +229,11 @@ export default function PosPage() {
     return `${currency.symbol}${parseFloat(amount || 0).toFixed(2)}`;
   };
 
+  // Cart badge for mobile
+  const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+
   return (
-    <div className="flex h-full">
+    <div className="flex flex-col md:flex-row h-full relative">
       {showCustomerModal && (
         <CustomerFormModal
           initialSearch={customerSearchTerm}
@@ -231,8 +242,23 @@ export default function PosPage() {
         />
       )}
 
+      {/* Mobile Cart Toggle Button */}
+      <div className="md:hidden fixed bottom-4 right-4 z-30">
+        <Button
+          onClick={() => setIsCartOpen(!isCartOpen)}
+          className="rounded-full p-4 h-14 w-14 shadow-lg relative bg-blue-600 hover:bg-blue-700"
+        >
+          <FiShoppingCart className="h-6 w-6 text-white" />
+          {cartItemCount > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full h-6 w-6 flex items-center justify-center text-xs">
+              {cartItemCount}
+            </span>
+          )}
+        </Button>
+      </div>
+
       {/* Product Selection Panel */}
-      <div className="w-2/3 p-4 flex flex-col">
+      <div className={`w-full md:w-2/3 p-4 flex flex-col ${isCartOpen ? 'hidden md:flex' : 'flex'}`}>
         <div className="mb-4">
           <Input
             placeholder="Search products..."
@@ -243,7 +269,7 @@ export default function PosPage() {
           />
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 flex-1 overflow-y-auto">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 flex-1 overflow-y-auto">
           {filteredProducts.map(product => (
             <ProductCard
               key={product.id}
@@ -256,9 +282,22 @@ export default function PosPage() {
       </div>
 
       {/* Cart Panel */}
-      <div className="w-1/3 border-l border-gray-200 dark:border-gray-700 flex flex-col">
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+      <div className={`w-full md:w-1/3 border-l border-gray-200 dark:border-gray-700 flex flex-col fixed md:relative inset-0 md:inset-auto bg-white dark:bg-gray-900 z-20 md:z-auto transform transition-transform duration-300 ease-in-out ${isCartOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'}`}>
+        {/* Mobile close button */}
+        <div className="md:hidden flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
           <h2 className="text-xl font-bold">Current Order</h2>
+          <button 
+            onClick={() => setIsCartOpen(false)}
+            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+          >
+            <FiX className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 md:mt-0">
+          <div className="hidden md:block">
+            <h2 className="text-xl font-bold">Current Order</h2>
+          </div>
           <div className="mt-3">
             <CustomerSelect
               selectedCustomer={customer}
@@ -273,14 +312,14 @@ export default function PosPage() {
               <Button
                 variant={paymentMethod === 'cash' ? 'default' : 'outline'}
                 onClick={() => setPaymentMethod('cash')}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 text-xs sm:text-sm"
               >
                 <FiDollarSign /> Cash
               </Button>
               <Button
                 variant={paymentMethod === 'card' ? 'default' : 'outline'}
                 onClick={() => setPaymentMethod('card')}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 text-xs sm:text-sm"
               >
                 <FiCreditCard /> Card
               </Button>
@@ -308,7 +347,7 @@ export default function PosPage() {
           )}
         </div>
 
-        <div className="border-t border-gray-200 dark:border-gray-700 p-4">
+        <div className="border-t border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900">
           <div className="space-y-2 mb-4">
             <div className="flex justify-between">
               <span>Subtotal:</span>
@@ -335,19 +374,28 @@ export default function PosPage() {
               variant="outline"
               onClick={() => setCart([])}
               disabled={cart.length === 0}
+              className="text-xs sm:text-sm"
             >
               Clear
             </Button>
             <Button
               onClick={handleCheckout}
               disabled={cart.length === 0}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm"
             >
               Checkout
             </Button>
           </div>
         </div>
       </div>
+
+      {/* Overlay for mobile cart */}
+      {isCartOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-10 md:hidden"
+          onClick={() => setIsCartOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -362,10 +410,10 @@ function ProductCard({ product, currencySymbol, onAdd }) {
   
     return (
       <div 
-        className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer flex flex-col h-64"
+        className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer flex flex-col h-48 sm:h-56 md:h-64"
         onClick={onAdd}
       >
-        <div className="aspect-square bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-1 max-h-[160px]">
+        <div className="aspect-square bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-1 max-h-[120px] sm:max-h-[140px] md:max-h-[160px]">
           {productImage ? (
             <AdvancedImage 
               cldImg={productImage}
@@ -373,15 +421,15 @@ function ProductCard({ product, currencySymbol, onAdd }) {
               alt={product.name}
             />
           ) : (
-            <div className="text-gray-400">No Image</div>
+            <div className="text-gray-400 text-xs sm:text-sm">No Image</div>
           )}
         </div>
-        <div className="p-3 flex flex-col">
-          <h3 className="font-medium truncate">{product.name}</h3>
-          <p className="text-gray-500 text-sm truncate mb-2">{product.description}</p>
+        <div className="p-2 sm:p-3 flex flex-col">
+          <h3 className="font-medium truncate text-sm sm:text-base">{product.name}</h3>
+          <p className="text-gray-500 text-xs sm:text-sm truncate mb-1 sm:mb-2">{product.description}</p>
           <div className="flex justify-between items-center mt-auto">
-            <span className="font-bold">{currencySymbol}{product.price.toFixed(2)}</span>
-            <span className={`text-xs px-2 py-1 rounded-full ${
+            <span className="font-bold text-sm sm:text-base">{currencySymbol}{product.price.toFixed(2)}</span>
+            <span className={`text-xs px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-full ${
               product.stock_quantity > 5 
                 ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
                 : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
@@ -398,33 +446,33 @@ function ProductCard({ product, currencySymbol, onAdd }) {
 function CartItem({ item, currencySymbol, onRemove, onQuantityChange }) {
   return (
     <li className="flex items-center justify-between p-2 border-b border-gray-100 dark:border-gray-700">
-      <div className="flex-1">
-        <h4 className="font-medium">{item.name}</h4>
+      <div className="flex-1 min-w-0">
+        <h4 className="font-medium truncate text-sm sm:text-base">{item.name}</h4>
         <p className="text-sm text-gray-500">{currencySymbol}{item.price.toFixed(2)} each</p>
       </div>
-      <div className="flex items-center space-x-2">
+      <div className="flex items-center space-x-2 ml-2">
         <button 
           onClick={() => onQuantityChange(item.quantity - 1)}
           className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
         >
-          <FiMinus className="h-4 w-4" />
+          <FiMinus className="h-3 w-3 sm:h-4 sm:w-4" />
         </button>
-        <span className="w-8 text-center">{item.quantity}</span>
+        <span className="w-6 text-center text-sm sm:text-base">{item.quantity}</span>
         <button 
           onClick={() => onQuantityChange(item.quantity + 1)}
           className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
         >
-          <FiPlus className="h-4 w-4" />
+          <FiPlus className="h-3 w-3 sm:h-4 sm:w-4" />
         </button>
       </div>
-      <div className="ml-4 font-medium">
+      <div className="ml-2 font-medium text-sm sm:text-base whitespace-nowrap">
         {currencySymbol}{(item.price * item.quantity).toFixed(2)}
       </div>
       <button 
         onClick={onRemove}
         className="ml-2 p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-full"
       >
-        <FiTrash2 className="h-4 w-4" />
+        <FiTrash2 className="h-3 w-3 sm:h-4 sm:w-4" />
       </button>
     </li>
   );
