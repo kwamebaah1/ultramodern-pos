@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { DataTable } from '@/components/ui/DataTable';
 import { ProductForm } from '@/components/products/ProductForm';
-import { useToast } from '@/components/ui/Toast';
+import toast from 'react-hot-toast';
 import { exportToCSV } from '@/lib/utils';
 import { CURRENCIES } from '@/components/currencies/Currency';
 
@@ -20,7 +20,7 @@ export default function ProductsPage() {
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [currency, setCurrency] = useState({ symbol: 'GH₵' });
-  const { toast } = useToast();
+  const [storeId, setStoreId] = useState(null);
 
   useEffect(() => {
     fetchProducts();
@@ -44,6 +44,7 @@ export default function ProductsPage() {
     }
 
     const storeId = userProfile.store_id;
+    setStoreId(storeId);
 
     const { data: storeData } = await supabase
       .from('stores')
@@ -97,22 +98,25 @@ export default function ProductsPage() {
 
   // CRUD Operations
   const handleCreate = async (productData) => {
-    const { error } = await supabase.from('products').insert(productData);
+    const { error } = await supabase.from('products').insert({
+      ...productData,
+      store_id: storeId,
+    });
     if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast.error('Error');
     } else {
-      toast({ title: 'Success', description: 'Product created successfully' });
+      toast.success('Success, Product created successfully' );
       fetchProducts();
       setIsFormOpen(false);
     }
   };
 
   const handleUpdate = async (id, productData) => {
-    const { error } = await supabase.from('products').update(productData).eq('id', id);
+    const { error } = await supabase.from('products').update({ ...productData, store_id: storeId }).eq('id', id);
     if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast.error('Error');
     } else {
-      toast({ title: 'Success', description: 'Product updated successfully' });
+      toast.success('Success, Product updated successfully');
       fetchProducts();
       setIsFormOpen(false);
     }
@@ -121,9 +125,9 @@ export default function ProductsPage() {
   const handleDelete = async (id) => {
     const { error } = await supabase.from('products').delete().eq('id', id);
     if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast.error('Error');
     } else {
-      toast({ title: 'Success', description: 'Product deleted successfully' });
+      toast.success('Success, Product deleted successfully');
       fetchProducts();
     }
   };
@@ -137,7 +141,7 @@ export default function ProductsPage() {
       accessorKey: 'image_url',
       header: '',
       cell: ({ row }) => (
-        <div className="w-12 h-12 rounded-md overflow-hidden">
+        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-md overflow-hidden">
           <img 
             src={row.original.image_url || '/shopping cart.jpg'} 
             alt={row.original.name}
@@ -151,19 +155,26 @@ export default function ProductsPage() {
       header: 'Name',
       cell: ({ row }) => (
         <div>
-          <div className="font-medium">{row.original.name}</div>
-          <div className="text-sm text-gray-500">{row.original.sku}</div>
+          <div className="font-medium text-sm sm:text-base">{row.original.name}</div>
+          <div className="text-xs sm:text-sm text-gray-500">{row.original.sku}</div>
         </div>
       ),
     },
     {
       accessorKey: 'category',
       header: 'Category',
+      cell: ({ row }) => (
+        <span className="hidden sm:inline">{row.original.category}</span>
+      ),
     },
     {
       accessorKey: 'price',
       header: 'Price',
-      cell: ({ row }) => `${currency.symbol}${row.original.price.toFixed(2)}`,
+      cell: ({ row }) => (
+        <span className="font-medium">
+          {currency.symbol}{row.original.price.toFixed(2)}
+        </span>
+      ),
     },
     {
       accessorKey: 'stock_quantity',
@@ -181,10 +192,11 @@ export default function ProductsPage() {
     {
       id: 'actions',
       cell: ({ row }) => (
-        <div className="flex space-x-2">
+        <div className="flex space-x-1 sm:space-x-2">
           <Button
             variant="ghost"
             size="sm"
+            className="h-8 w-8 p-0"
             onClick={() => {
               setCurrentProduct(row.original);
               setIsFormOpen(true);
@@ -195,6 +207,7 @@ export default function ProductsPage() {
           <Button
             variant="ghost"
             size="sm"
+            className="h-8 w-8 p-0"
             onClick={() => handleDelete(row.original.id)}
           >
             <FiTrash2 className="h-4 w-4 text-red-500" />
@@ -205,42 +218,43 @@ export default function ProductsPage() {
   ];
 
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Products Management</h1>
-        <div className="flex space-x-2">
-          <Button onClick={() => exportToCSV(filteredProducts, 'products')}>
-            <FiDownload className="mr-2 h-4 w-4" />
-            Export
+    <div className="p-4 sm:p-6 space-y-4">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+        <h1 className="text-xl sm:text-2xl font-bold">Products Management</h1>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => exportToCSV(filteredProducts, 'products')} size="sm" className="text-xs sm:text-sm">
+            <FiDownload className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden sm:inline">Export</span>
           </Button>
-          <Button variant="outline">
-            <FiUpload className="mr-2 h-4 w-4" />
-            Import
+          <Button variant="outline" size="sm" className="text-xs sm:text-sm">
+            <FiUpload className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden sm:inline">Import</span>
           </Button>
           <Button onClick={() => {
             setCurrentProduct(null);
             setIsFormOpen(true);
-          }}>
-            <FiPlus className="mr-2 h-4 w-4" />
-            Add Product
+          }} size="sm" className="text-xs sm:text-sm">
+            <FiPlus className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden sm:inline">Add Product</span>
+            <span className="sm:hidden">Add</span>
           </Button>
         </div>
       </div>
 
-      <div className="flex items-center space-x-4">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <Input
           placeholder="Search products..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           icon={<FiSearch className="text-gray-400" />}
-          className="w-full max-w-md"
+          className="w-full"
         />
-        <div className="flex items-center space-x-2">
-          <FiFilter className="text-gray-500" />
+        <div className="flex items-center gap-2">
+          <FiFilter className="text-gray-500 hidden sm:block" />
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="bg-background border rounded-md px-3 py-2 text-sm focus:outline-none"
+            className="bg-background border rounded-md px-3 py-2 text-sm focus:outline-none w-full sm:w-auto"
           >
             <option value="all">All Categories</option>
             {categories.map(category => (
@@ -250,17 +264,20 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      <DataTable
-        columns={columns}
-        data={filteredProducts}
-        emptyMessage="No products found"
-      />
+      <div className="overflow-x-auto">
+        <DataTable
+          columns={columns}
+          data={filteredProducts}
+          emptyMessage="No products found"
+        />
+      </div>
 
       <ProductForm
         open={isFormOpen}
         onOpenChange={setIsFormOpen}
         product={currentProduct}
         onSubmit={currentProduct ? handleUpdate : handleCreate}
+        storeId={storeId}
       />
     </div>
   );
