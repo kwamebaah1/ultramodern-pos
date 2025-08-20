@@ -164,7 +164,7 @@ export default function ProductsPage() {
       accessorKey: 'category',
       header: 'Category',
       cell: ({ row }) => (
-        <span className="hidden sm:inline">{row.original.category}</span>
+        <span className="">{row.original.category}</span>
       ),
     },
     {
