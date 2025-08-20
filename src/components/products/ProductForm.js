@@ -99,7 +99,7 @@ export function ProductForm({ open, onOpenChange, product, onSubmit }) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto hide-scrollbar">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto hide-scrollbar-desktop">
         <DialogHeader>
           <DialogTitle className="text-lg sm:text-xl">
             {product ? 'Edit Product' : 'Add New Product'}

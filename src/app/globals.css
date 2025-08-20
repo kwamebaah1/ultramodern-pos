@@ -127,3 +127,13 @@
   -ms-overflow-style: none; 
   scrollbar-width: none; 
 }
+
+@media (min-width: 768px) {
+  .hide-scrollbar-desktop::-webkit-scrollbar {
+    display: none;
+  }
+  .hide-scrollbar-desktop {
+    -ms-overflow-style: none;  /* IE/Edge */
+    scrollbar-width: none;     /* Firefox */
+  }
+}
