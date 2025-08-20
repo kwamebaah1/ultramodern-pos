@@ -99,130 +99,140 @@ export function ProductForm({ open, onOpenChange, product, onSubmit }) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-lg sm:text-xl">
             {product ? 'Edit Product' : 'Add New Product'}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Product Name*</Label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="name" className="text-sm md:text-base">Product Name*</Label>
               <Input
                 id="name"
                 {...register('name')}
                 error={errors.name?.message}
+                className="text-sm md:text-base"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="price">Price*</Label>
+              <Label htmlFor="price" className="text-sm md:text-base">Price*</Label>
               <Input
                 id="price"
                 type="number"
                 step="0.01"
+                min="0"
                 {...register('price', { valueAsNumber: true })}
                 error={errors.price?.message}
+                className="text-sm md:text-base"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="cost">Cost</Label>
+              <Label htmlFor="cost" className="text-sm md:text-base">Cost</Label>
               <Input
                 id="cost"
                 type="number"
                 step="0.01"
+                min="0"
                 {...register('cost', { valueAsNumber: true })}
                 error={errors.cost?.message}
+                className="text-sm md:text-base"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="stock_quantity">Stock Quantity*</Label>
+              <Label htmlFor="stock_quantity" className="text-sm md:text-base">Stock Quantity*</Label>
               <Input
                 id="stock_quantity"
                 type="number"
+                min="0"
                 {...register('stock_quantity', { valueAsNumber: true })}
                 error={errors.stock_quantity?.message}
+                className="text-sm md:text-base"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="min_stock_level">Minimum Stock Level</Label>
+              <Label htmlFor="min_stock_level" className="text-sm md:text-base">Minimum Stock Level</Label>
               <Input
                 id="min_stock_level"
                 type="number"
+                min="0"
                 {...register('min_stock_level', { valueAsNumber: true })}
                 error={errors.min_stock_level?.message}
+                className="text-sm md:text-base"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="sku">SKU (Product Code)</Label>
+              <Label htmlFor="sku" className="text-sm md:text-base">SKU (Product Code)</Label>
               <Input
                 id="sku"
                 {...register('sku')}
                 error={errors.sku?.message}
+                className="text-sm md:text-base"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="barcode">Barcode</Label>
+              <Label htmlFor="barcode" className="text-sm md:text-base">Barcode</Label>
               <Input
                 id="barcode"
                 {...register('barcode')}
                 error={errors.barcode?.message}
+                className="text-sm md:text-base"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="category">Category</Label>
+              <Label htmlFor="category" className="text-sm md:text-base">Category</Label>
               <Input
                 id="category"
                 {...register('category')}
                 error={errors.category?.message}
+                className="text-sm md:text-base"
               />
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description" className="text-sm md:text-base">Description</Label>
               <Textarea
                 id="description"
                 {...register('description')}
                 error={errors.description?.message}
                 rows={3}
+                className="text-sm md:text-base min-h-[80px]"
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>Product Image</Label>
-              <ImageUpload 
-                onUpload={(publicId) => {
-                  setValue('image_public_id', publicId);
-                  setValue('image_url', 
-                    `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/${publicId}`
-                  );
-                }}
-                currentImage={watch('image_url')}
-              />
+            <div className="space-y-2 md:col-span-2">
+              <Label className="text-sm md:text-base">Product Image</Label>
+              <div className="border rounded-lg p-3 md:p-4">
+                <ImageUpload 
+                  onUpload={handleImageUpload}
+                  currentImage={watch('image_url')}
+                />
+              </div>
               {errors.image_public_id?.message && (
                 <p className="text-sm text-red-500">{errors.image_public_id.message}</p>
               )}
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 md:col-span-2 pt-2">
               <input
                 type="checkbox"
                 id="is_active"
                 {...register('is_active')}
-                className="h-4 w-4"
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
               />
-              <Label htmlFor="is_active">Active Product</Label>
+              <Label htmlFor="is_active" className="text-sm md:text-base">Active Product</Label>
             </div>
           </div>
 
-          <div className="flex justify-end space-x-2">
+          <div className="flex flex-col-reverse sm:flex-row justify-end space-y-2 space-y-reverse sm:space-y-0 sm:space-x-2 pt-4">
             <Button
               type="button"
               variant="outline"
@@ -230,10 +240,15 @@ export function ProductForm({ open, onOpenChange, product, onSubmit }) {
                 reset();
                 onOpenChange(false);
               }}
+              className="w-full sm:w-auto text-sm md:text-base"
             >
               Cancel
             </Button>
-            <Button type="submit" isLoading={isLoading}>
+            <Button 
+              type="submit" 
+              isLoading={isLoading}
+              className="w-full sm:w-auto text-sm md:text-base"
+            >
               {product ? 'Update Product' : 'Add Product'}
             </Button>
           </div>
