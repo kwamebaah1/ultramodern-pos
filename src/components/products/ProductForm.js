@@ -43,6 +43,13 @@ export function ProductForm({ open, onOpenChange, product, onSubmit }) {
     },
   });
 
+  const generateSku = (name) => {
+    if (!name) return '';
+    const prefix = name.trim().substring(0, 3).toUpperCase();
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    return `${prefix}-${randomNum}`;
+  };
+
   useEffect(() => {
     if (product) {
       reset({
@@ -71,6 +78,15 @@ export function ProductForm({ open, onOpenChange, product, onSubmit }) {
       });
     }
   }, [product, reset]);
+
+  const productName = watch('name');
+  const currentSku = watch('sku');
+
+  useEffect(() => {
+    if (productName && !currentSku) {
+      setValue('sku', generateSku(productName));
+    }
+  }, [productName, currentSku, setValue]);
 
   const handleImageUpload = (publicId) => {
     setValue('image_public_id', publicId);
