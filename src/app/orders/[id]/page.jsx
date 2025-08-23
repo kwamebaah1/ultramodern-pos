@@ -137,9 +137,9 @@ export default function OrderReceipt({ params }) {
       <div className={`max-w-4xl mx-auto mb-6 print:hidden ${isPrinting ? 'hidden' : 'block'}`}>
         <div className="flex flex-col sm:flex-row justify-between items-center gap-3 bg-white p-4 rounded-lg shadow-sm">
           <Button
-            //variant="outline"
+            variant="outline"
             onClick={() => router.push('/pos')}
-            className="flex items-center gap-2 w-full sm:w-auto justify-center text-white"
+            className="flex items-center gap-2 w-full sm:w-auto justify-center"
           >
             <FiArrowLeft className="h-4 w-4" />
             Back to POS
