@@ -179,7 +179,7 @@ export default function OrderReceipt({ params }) {
               </div>
               <div>
                 <p className="text-xs md:text-sm text-gray-500 print:text-xs">Date</p>
-                <p className="font-medium text-sm md:text-base print:text-sm text-gray-500">{formatDate(order.created_at)}</p>
+                <p className="font-medium text-sm md:text-base print:text-sm text-black">{formatDate(order.created_at)}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -188,7 +188,7 @@ export default function OrderReceipt({ params }) {
               </div>
               <div>
                 <p className="text-xs md:text-sm text-gray-500 print:text-xs">Time</p>
-                <p className="font-medium text-sm md:text-base print:text-sm text-gray-500">{formatTime(order.created_at)}</p>
+                <p className="font-medium text-sm md:text-base print:text-sm text-black">{formatTime(order.created_at)}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -197,7 +197,7 @@ export default function OrderReceipt({ params }) {
               </div>
               <div>
                 <p className="text-xs md:text-sm text-gray-500 print:text-xs">Payment</p>
-                <p className="font-medium text-sm md:text-base capitalize print:text-sm text-gray-500">{order.payment_method || 'Cash'}</p>
+                <p className="font-medium text-sm md:text-base capitalize print:text-sm text-black">{order.payment_method || 'Cash'}</p>
               </div>
             </div>
           </div>
@@ -267,15 +267,15 @@ export default function OrderReceipt({ params }) {
           <div className="space-y-2 print:space-y-1">
             <div className="flex justify-between">
               <span className="text-gray-600 text-sm md:text-base print:text-sm">Subtotal:</span>
-              <span className="font-medium text-sm md:text-base print:text-sm text-gray-500">{currency.symbol}{order.subtotal.toFixed(2)}</span>
+              <span className="font-medium text-sm md:text-base print:text-sm text-black">{currency.symbol}{order.subtotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600 text-sm md:text-base print:text-sm">Tax ({order.tax_amount > 0 ? (order.tax_amount / order.subtotal * 100).toFixed(0) : 0}%):</span>
-              <span className="font-medium text-sm md:text-base print:text-sm text-gray-500">{currency.symbol}{order.tax_amount.toFixed(2)}</span>
+              <span className="font-medium text-sm md:text-base print:text-sm text-black">{currency.symbol}{order.tax_amount.toFixed(2)}</span>
             </div>
             <div className="flex justify-between pt-2 border-t border-gray-200 print:pt-1 print:border-t-2">
               <span className="font-semibold text-base md:text-lg print:text-sm text-gray-500">Total:</span>
-              <span className="font-bold text-base md:text-lg print:text-base text-gray-500">{currency.symbol}{order.total.toFixed(2)}</span>
+              <span className="font-bold text-base md:text-lg print:text-base text-black">{currency.symbol}{order.total.toFixed(2)}</span>
             </div>
           </div>
         </div>
