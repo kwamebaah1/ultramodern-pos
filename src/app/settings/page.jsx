@@ -102,7 +102,7 @@ export default function SettingsPage() {
         </button>
         
         {showMobileMenu && (
-          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-10">
+          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-10 text-black">
             <button
               onClick={() => {
                 setActiveTab('store');
