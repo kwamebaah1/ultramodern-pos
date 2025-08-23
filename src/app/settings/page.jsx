@@ -94,9 +94,9 @@ export default function SettingsPage() {
           onClick={() => setShowMobileMenu(!showMobileMenu)}
           className="w-full flex justify-between items-center p-3 border border-gray-300 rounded-lg bg-white shadow-sm"
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 text-black">
             {getTabIcon(activeTab)}
-            <span className=' text-black'>{getTabName(activeTab)}</span>
+            <span className='text-black'>{getTabName(activeTab)}</span>
           </div>
           <FiChevronDown className={`transform transition-transform text-black ${showMobileMenu ? 'rotate-180' : ''}`} />
         </button>
