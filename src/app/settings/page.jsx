@@ -96,9 +96,9 @@ export default function SettingsPage() {
         >
           <div className="flex items-center gap-2">
             {getTabIcon(activeTab)}
-            <span>{getTabName(activeTab)}</span>
+            <span className=' text-black'>{getTabName(activeTab)}</span>
           </div>
-          <FiChevronDown className={`transform transition-transform ${showMobileMenu ? 'rotate-180' : ''}`} />
+          <FiChevronDown className={`transform transition-transform text-black ${showMobileMenu ? 'rotate-180' : ''}`} />
         </button>
         
         {showMobileMenu && (
