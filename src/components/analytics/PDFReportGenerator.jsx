@@ -15,14 +15,15 @@ import {
   FiShoppingBag,
   FiUser,
   FiCheckCircle,
-  FiXCircle
+  FiXCircle,
+  FiAlertCircle
 } from 'react-icons/fi';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { DateRangePicker } from '@/components/ui/DateRangePicker';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { supabase } from '@/lib/supabase/client';
-import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth, subMonths, startOfDay, endOfDay } from 'date-fns';
 import { CURRENCIES } from '@/components/currencies/Currency';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -39,29 +40,43 @@ export function PDFReportGenerator() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [reportType, setReportType] = useState('sales'); // 'sales', 'products', 'inventory'
+  const [error, setError] = useState(null);
   
   const reportRef = useRef(null);
 
   const fetchReportData = async () => {
     setIsLoading(true);
+    setError(null);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        setError('Please log in to view reports');
+        setIsLoading(false);
+        return;
+      }
 
       // Get store info
-      const { data: userData } = await supabase
+      const { data: userData, error: userError } = await supabase
         .from('users')
         .select('store_id')
         .eq('auth_user_id', user.id)
         .single();
 
-      if (!userData) return;
+      if (userError || !userData) {
+        setError('Store information not found');
+        setIsLoading(false);
+        return;
+      }
 
-      const { data: storeData } = await supabase
+      const { data: storeData, error: storeError } = await supabase
         .from('stores')
         .select('currency, name')
         .eq('id', userData.store_id)
         .single();
+
+      if (storeError) {
+        console.error('Store fetch error:', storeError);
+      }
 
       const currentCurrency = CURRENCIES.find(c => c.code === (storeData?.currency || 'GHS')) || CURRENCIES.find(c => c.code === 'GHS');
       setCurrency(currentCurrency);
@@ -69,8 +84,14 @@ export function PDFReportGenerator() {
       const storeId = userData.store_id;
       const storeName = storeData?.name || 'My Store';
 
-      // Fetch sales data
-      const { data: salesData } = await supabase
+      // Adjust date range to include full days
+      const startDate = startOfDay(dateRange.start);
+      const endDate = endOfDay(dateRange.end);
+
+      console.log('Fetching data for period:', startDate.toISOString(), 'to', endDate.toISOString());
+
+      // Fetch sales data - IMPORTANT: Check if status field exists in your orders table
+      const { data: salesData, error: salesError } = await supabase
         .from('orders')
         .select(`
           id,
@@ -79,55 +100,131 @@ export function PDFReportGenerator() {
           status,
           payment_method,
           created_at,
-          customer:customers (
-            name,
-            email
-          )
+          customer_id
         `)
         .eq('store_id', storeId)
-        .eq('status', 'completed')
-        .gte('created_at', dateRange.start.toISOString())
-        .lte('created_at', dateRange.end.toISOString())
+        // Check if status column exists before filtering by it
+        // .eq('status', 'completed') // Comment out if status doesn't exist
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString())
         .order('created_at', { ascending: false });
 
-      // Fetch order items for detailed product sales
-      const { data: orderItems } = await supabase
-        .from('order_items')
-        .select(`
-          id,
-          order_id,
-          quantity,
-          unit_price,
-          total_price,
-          product:products (
+      if (salesError) {
+        console.error('Sales data fetch error:', salesError);
+        // Try without status filter if it fails
+        const { data: salesDataRetry } = await supabase
+          .from('orders')
+          .select(`
             id,
-            name,
-            sku,
-            category,
-            cost,
-            price,
-            stock_quantity
-          )
-        `)
-        .in('order_id', salesData?.map(order => order.id) || [])
-        .order('created_at', { ascending: false });
+            order_number,
+            total,
+            payment_method,
+            created_at,
+            customer_id
+          `)
+          .eq('store_id', storeId)
+          .gte('created_at', startDate.toISOString())
+          .lte('created_at', endDate.toISOString())
+          .order('created_at', { ascending: false });
+        
+        if (salesDataRetry) {
+          console.log('Found orders without status filter:', salesDataRetry.length);
+        }
+      }
+
+      console.log('Sales data found:', salesData?.length || 0, 'orders');
+
+      // Fetch order items
+      const orderIds = salesData?.map(order => order.id) || [];
+      let orderItems = [];
+      
+      if (orderIds.length > 0) {
+        const { data: itemsData, error: itemsError } = await supabase
+          .from('order_items')
+          .select(`
+            id,
+            order_id,
+            quantity,
+            unit_price,
+            total_price,
+            product_id
+          `)
+          .in('order_id', orderIds);
+
+        if (itemsError) {
+          console.error('Order items fetch error:', itemsError);
+        } else {
+          orderItems = itemsData || [];
+          
+          // Fetch product details for each order item
+          const productIds = [...new Set(orderItems.map(item => item.product_id).filter(Boolean))];
+          
+          if (productIds.length > 0) {
+            const { data: productsData, error: productsError } = await supabase
+              .from('products')
+              .select('id, name, sku, category, cost, price, stock_quantity, min_stock_level')
+              .in('id', productIds)
+              .eq('store_id', storeId);
+
+            if (productsError) {
+              console.error('Products fetch error:', productsError);
+            } else {
+              // Map product details to order items
+              const productsMap = {};
+              productsData?.forEach(product => {
+                productsMap[product.id] = product;
+              });
+
+              orderItems = orderItems.map(item => ({
+                ...item,
+                product: productsMap[item.product_id] || null
+              }));
+            }
+          }
+        }
+      }
+
+      console.log('Order items found:', orderItems.length);
 
       // Fetch all products for inventory report
-      const { data: allProducts } = await supabase
+      const { data: allProducts, error: productsError } = await supabase
         .from('products')
         .select('*')
         .eq('store_id', storeId)
         .eq('is_active', true)
         .order('name');
 
+      if (productsError) {
+        console.error('All products fetch error:', productsError);
+      }
+
+      // Fetch customer details if needed
+      const customerIds = [...new Set(salesData?.map(order => order.customer_id).filter(Boolean) || [])];
+      let customersMap = {};
+      
+      if (customerIds.length > 0) {
+        const { data: customersData } = await supabase
+          .from('customers')
+          .select('id, name, email')
+          .in('id', customerIds);
+        
+        customersData?.forEach(customer => {
+          customersMap[customer.id] = customer;
+        });
+      }
+
       // Calculate summary metrics
-      const totalSales = salesData?.reduce((sum, order) => sum + parseFloat(order.total || 0), 0) || 0;
+      const totalSales = salesData?.reduce((sum, order) => {
+        return sum + (parseFloat(order.total || order.subtotal || 0) || 0);
+      }, 0) || 0;
+
       const totalOrders = salesData?.length || 0;
       
       const totalProfit = orderItems?.reduce((sum, item) => {
         const price = parseFloat(item.product?.price || item.unit_price || 0);
         const cost = parseFloat(item.product?.cost || 0);
-        return sum + ((price - cost) * (item.quantity || 0));
+        const quantity = item.quantity || 0;
+        return sum + ((price - cost) * quantity);
       }, 0) || 0;
 
       const totalProductsSold = orderItems?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
@@ -141,8 +238,14 @@ export function PDFReportGenerator() {
 
       // Calculate inventory status
       const lowStockProducts = allProducts?.filter(product => 
-        product.stock_quantity <= product.min_stock_level
+        (product.stock_quantity || 0) <= (product.min_stock_level || 0)
       ) || [];
+
+      // Map customer info to sales
+      const salesWithCustomers = salesData?.map(sale => ({
+        ...sale,
+        customer: customersMap[sale.customer_id] || null
+      })) || [];
 
       setReportData({
         storeName,
@@ -154,7 +257,7 @@ export function PDFReportGenerator() {
           profitMargin: totalSales > 0 ? (totalProfit / totalSales * 100) : 0,
           averageOrderValue: totalOrders > 0 ? totalSales / totalOrders : 0
         },
-        sales: salesData || [],
+        sales: salesWithCustomers,
         orderItems: orderItems || [],
         products: allProducts || [],
         categories: Object.entries(productsByCategory).map(([name, quantity]) => ({ name, quantity })),
@@ -165,8 +268,19 @@ export function PDFReportGenerator() {
         }
       });
 
+      console.log('Report data summary:', {
+        totalSales,
+        totalOrders,
+        totalProductsSold,
+        totalProfit,
+        salesCount: salesWithCustomers.length,
+        orderItemsCount: orderItems.length,
+        productsCount: allProducts?.length || 0
+      });
+
     } catch (error) {
       console.error('Error fetching report data:', error);
+      setError('Failed to load report data. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -186,8 +300,8 @@ export function PDFReportGenerator() {
   
   const totalPages = Math.ceil(
     (reportType === 'sales' ? reportData?.sales?.length || 0 :
-     reportType === 'products' ? reportData?.products?.length || 0 :
-     reportData?.orderItems?.length || 0) / itemsPerPage
+     reportType === 'products' ? reportData?.orderItems?.length || 0 :
+     reportType === 'inventory' ? reportData?.products?.length || 0 : 0) / itemsPerPage
   );
 
   const generatePDF = async () => {
@@ -247,107 +361,113 @@ export function PDFReportGenerator() {
       });
 
       // Sales Details Section
-      let finalY = (doc).lastAutoTable.finalY + 15;
+      let finalY = doc.lastAutoTable.finalY + 15;
       
       if (finalY > 250) {
         doc.addPage();
         finalY = 20;
       }
 
-      doc.setFontSize(14);
-      doc.setTextColor(44, 62, 80);
-      doc.setFont('helvetica', 'bold');
-      doc.text('SALES DETAILS', 20, finalY);
+      if (reportData.sales.length > 0) {
+        doc.setFontSize(14);
+        doc.setTextColor(44, 62, 80);
+        doc.setFont('helvetica', 'bold');
+        doc.text('SALES DETAILS', 20, finalY);
 
-      const salesTableData = reportData.sales.map((sale, index) => [
-        index + 1,
-        sale.order_number || `ORDER-${sale.id.slice(0, 8)}`,
-        format(new Date(sale.created_at), 'MMM dd, yyyy'),
-        sale.customer?.name || 'Walk-in Customer',
-        sale.payment_method || 'Cash',
-        `${currency.symbol}${parseFloat(sale.total || 0).toFixed(2)}`
-      ]);
+        const salesTableData = reportData.sales.map((sale, index) => [
+          index + 1,
+          sale.order_number || `ORDER-${sale.id?.slice(0, 8) || index}`,
+          format(new Date(sale.created_at), 'MMM dd, yyyy'),
+          sale.customer?.name || 'Walk-in Customer',
+          sale.payment_method || 'Cash',
+          `${currency.symbol}${parseFloat(sale.total || 0).toFixed(2)}`
+        ]);
 
-      doc.autoTable({
-        startY: finalY + 5,
-        head: [['#', 'Order ID', 'Date', 'Customer', 'Payment', 'Amount']],
-        body: salesTableData,
-        theme: 'grid',
-        headStyles: { fillColor: [52, 152, 219], textColor: 255 },
-        styles: { fontSize: 9, cellPadding: 4 },
-        margin: { left: 20, right: 20 },
-        pageBreak: 'auto'
-      });
+        doc.autoTable({
+          startY: finalY + 5,
+          head: [['#', 'Order ID', 'Date', 'Customer', 'Payment', 'Amount']],
+          body: salesTableData,
+          theme: 'grid',
+          headStyles: { fillColor: [52, 152, 219], textColor: 255 },
+          styles: { fontSize: 9, cellPadding: 4 },
+          margin: { left: 20, right: 20 },
+          pageBreak: 'auto'
+        });
+
+        finalY = doc.lastAutoTable.finalY + 15;
+      }
 
       // Product Sales Section
-      finalY = (doc).lastAutoTable.finalY + 15;
-      
       if (finalY > 250) {
         doc.addPage();
         finalY = 20;
       }
 
-      doc.setFontSize(14);
-      doc.setTextColor(44, 62, 80);
-      doc.setFont('helvetica', 'bold');
-      doc.text('PRODUCT SALES', 20, finalY);
+      if (reportData.orderItems.length > 0) {
+        doc.setFontSize(14);
+        doc.setTextColor(44, 62, 80);
+        doc.setFont('helvetica', 'bold');
+        doc.text('PRODUCT SALES', 20, finalY);
 
-      const productSalesData = reportData.orderItems.map((item, index) => [
-        index + 1,
-        item.product?.name || 'Unknown Product',
-        item.product?.sku || 'N/A',
-        item.product?.category || 'Uncategorized',
-        item.quantity.toString(),
-        `${currency.symbol}${parseFloat(item.unit_price || 0).toFixed(2)}`,
-        `${currency.symbol}${parseFloat(item.total_price || 0).toFixed(2)}`
-      ]);
+        const productSalesData = reportData.orderItems.map((item, index) => [
+          index + 1,
+          item.product?.name || 'Unknown Product',
+          item.product?.sku || 'N/A',
+          item.product?.category || 'Uncategorized',
+          item.quantity.toString(),
+          `${currency.symbol}${parseFloat(item.unit_price || 0).toFixed(2)}`,
+          `${currency.symbol}${parseFloat(item.total_price || 0).toFixed(2)}`
+        ]);
 
-      doc.autoTable({
-        startY: finalY + 5,
-        head: [['#', 'Product', 'SKU', 'Category', 'Qty', 'Unit Price', 'Total']],
-        body: productSalesData,
-        theme: 'grid',
-        headStyles: { fillColor: [46, 204, 113], textColor: 255 },
-        styles: { fontSize: 8, cellPadding: 3 },
-        margin: { left: 20, right: 20 },
-        pageBreak: 'auto'
-      });
+        doc.autoTable({
+          startY: finalY + 5,
+          head: [['#', 'Product', 'SKU', 'Category', 'Qty', 'Unit Price', 'Total']],
+          body: productSalesData,
+          theme: 'grid',
+          headStyles: { fillColor: [46, 204, 113], textColor: 255 },
+          styles: { fontSize: 8, cellPadding: 3 },
+          margin: { left: 20, right: 20 },
+          pageBreak: 'auto'
+        });
+
+        finalY = doc.lastAutoTable.finalY + 15;
+      }
 
       // Inventory Status Section
-      finalY = (doc).lastAutoTable.finalY + 15;
-      
       if (finalY > 250) {
         doc.addPage();
         finalY = 20;
       }
 
-      doc.setFontSize(14);
-      doc.setTextColor(44, 62, 80);
-      doc.setFont('helvetica', 'bold');
-      doc.text('INVENTORY STATUS', 20, finalY);
+      if (reportData.products.length > 0) {
+        doc.setFontSize(14);
+        doc.setTextColor(44, 62, 80);
+        doc.setFont('helvetica', 'bold');
+        doc.text('INVENTORY STATUS', 20, finalY);
 
-      const inventoryData = reportData.products.map((product, index) => [
-        index + 1,
-        product.name,
-        product.sku || 'N/A',
-        product.category || 'Uncategorized',
-        product.stock_quantity.toString(),
-        product.min_stock_level.toString(),
-        product.stock_quantity <= product.min_stock_level ? 'LOW STOCK' : 'OK',
-        `${currency.symbol}${parseFloat(product.cost || 0).toFixed(2)}`,
-        `${currency.symbol}${parseFloat(product.price || 0).toFixed(2)}`
-      ]);
+        const inventoryData = reportData.products.map((product, index) => [
+          index + 1,
+          product.name,
+          product.sku || 'N/A',
+          product.category || 'Uncategorized',
+          (product.stock_quantity || 0).toString(),
+          (product.min_stock_level || 0).toString(),
+          (product.stock_quantity || 0) <= (product.min_stock_level || 0) ? 'LOW STOCK' : 'OK',
+          `${currency.symbol}${parseFloat(product.cost || 0).toFixed(2)}`,
+          `${currency.symbol}${parseFloat(product.price || 0).toFixed(2)}`
+        ]);
 
-      doc.autoTable({
-        startY: finalY + 5,
-        head: [['#', 'Product', 'SKU', 'Category', 'Current Stock', 'Min Stock', 'Status', 'Cost', 'Price']],
-        body: inventoryData,
-        theme: 'grid',
-        headStyles: { fillColor: [155, 89, 182], textColor: 255 },
-        styles: { fontSize: 7, cellPadding: 3 },
-        margin: { left: 20, right: 20 },
-        pageBreak: 'auto'
-      });
+        doc.autoTable({
+          startY: finalY + 5,
+          head: [['#', 'Product', 'SKU', 'Category', 'Current Stock', 'Min Stock', 'Status', 'Cost', 'Price']],
+          body: inventoryData,
+          theme: 'grid',
+          headStyles: { fillColor: [155, 89, 182], textColor: 255 },
+          styles: { fontSize: 7, cellPadding: 3 },
+          margin: { left: 20, right: 20 },
+          pageBreak: 'auto'
+        });
+      }
 
       // Footer on each page
       const pageCount = doc.internal.getNumberOfPages();
@@ -379,6 +499,7 @@ export function PDFReportGenerator() {
 
     } catch (error) {
       console.error('Error generating PDF:', error);
+      alert('Error generating PDF. Please check the console for details.');
     } finally {
       setIsGeneratingPDF(false);
     }
@@ -400,6 +521,49 @@ export function PDFReportGenerator() {
     });
   };
 
+  const handleDateChange = (newDateRange) => {
+    setDateRange(newDateRange);
+    setCurrentPage(1); // Reset to first page when date changes
+  };
+
+  // Debug function to check database
+  const debugDatabase = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: userData } = await supabase
+        .from('users')
+        .select('store_id')
+        .eq('auth_user_id', user.id)
+        .single();
+
+      if (!userData) return;
+
+      const storeId = userData.store_id;
+      
+      // Check orders
+      const { data: orders } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('store_id', storeId)
+        .limit(5);
+
+      console.log('Recent orders:', orders);
+
+      // Check order items
+      const { data: items } = await supabase
+        .from('order_items')
+        .select('*')
+        .limit(5);
+
+      console.log('Recent order items:', items);
+
+    } catch (error) {
+      console.error('Debug error:', error);
+    }
+  };
+
   if (isLoading) {
     return (
       <Card className="mb-6">
@@ -408,6 +572,29 @@ export function PDFReportGenerator() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Skeleton className="h-40 rounded-lg" />
             <Skeleton className="h-40 rounded-lg" />
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="mb-6">
+        <div className="p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <FiAlertCircle className="h-6 w-6 text-red-600" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Error Loading Data</h3>
+          </div>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
+          <div className="flex gap-3">
+            <Button onClick={fetchReportData} variant="outline">
+              <FiRefreshCw className="mr-2" />
+              Retry
+            </Button>
+            <Button onClick={debugDatabase} variant="outline">
+              Debug Database
+            </Button>
           </div>
         </div>
       </Card>
@@ -432,7 +619,7 @@ export function PDFReportGenerator() {
           <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
             <Button
               onClick={generatePDF}
-              disabled={!reportData || isGeneratingPDF}
+              disabled={!reportData || isGeneratingPDF || (reportData?.sales?.length === 0 && reportData?.orderItems?.length === 0)}
               className="w-full sm:w-auto"
               variant="primary"
             >
@@ -444,6 +631,7 @@ export function PDFReportGenerator() {
               onClick={() => window.print()}
               variant="outline"
               className="w-full sm:w-auto"
+              disabled={!reportData || (reportData?.sales?.length === 0 && reportData?.orderItems?.length === 0)}
             >
               <FiPrinter className="mr-2" />
               Print Preview
@@ -462,7 +650,7 @@ export function PDFReportGenerator() {
               </label>
               <DateRangePicker
                 value={dateRange}
-                onChange={setDateRange}
+                onChange={handleDateChange}
                 className="w-full"
               />
               
@@ -470,21 +658,40 @@ export function PDFReportGenerator() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => handleQuickDateSelect(0)}
+                  onClick={() => {
+                    const today = new Date();
+                    setDateRange({
+                      start: startOfMonth(today),
+                      end: endOfMonth(today)
+                    });
+                  }}
                 >
                   This Month
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => handleQuickDateSelect(1)}
+                  onClick={() => {
+                    const today = new Date();
+                    const lastMonth = subMonths(today, 1);
+                    setDateRange({
+                      start: startOfMonth(lastMonth),
+                      end: endOfMonth(lastMonth)
+                    });
+                  }}
                 >
                   Last Month
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => handleQuickDateSelect(3)}
+                  onClick={() => {
+                    const today = new Date();
+                    setDateRange({
+                      start: startOfMonth(subMonths(today, 3)),
+                      end: endOfMonth(today)
+                    });
+                  }}
                 >
                   Last 3 Months
                 </Button>
@@ -501,7 +708,10 @@ export function PDFReportGenerator() {
                 <Button
                   size="sm"
                   variant={reportType === 'sales' ? 'primary' : 'outline'}
-                  onClick={() => setReportType('sales')}
+                  onClick={() => {
+                    setReportType('sales');
+                    setCurrentPage(1);
+                  }}
                   className="justify-start"
                 >
                   <FiDollarSign className="mr-2" />
@@ -510,7 +720,10 @@ export function PDFReportGenerator() {
                 <Button
                   size="sm"
                   variant={reportType === 'products' ? 'primary' : 'outline'}
-                  onClick={() => setReportType('products')}
+                  onClick={() => {
+                    setReportType('products');
+                    setCurrentPage(1);
+                  }}
                   className="justify-start"
                 >
                   <FiPackage className="mr-2" />
@@ -519,7 +732,10 @@ export function PDFReportGenerator() {
                 <Button
                   size="sm"
                   variant={reportType === 'inventory' ? 'primary' : 'outline'}
-                  onClick={() => setReportType('inventory')}
+                  onClick={() => {
+                    setReportType('inventory');
+                    setCurrentPage(1);
+                  }}
                   className="justify-start"
                 >
                   <FiTrendingUp className="mr-2" />
@@ -538,7 +754,7 @@ export function PDFReportGenerator() {
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600 dark:text-gray-400">Period:</span>
                     <span className="text-sm font-medium">
-                      {format(reportData.dateRange.start, 'MMM d')} - {format(reportData.dateRange.end, 'MMM d')}
+                      {format(dateRange.start, 'MMM d')} - {format(dateRange.end, 'MMM d')}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -567,6 +783,21 @@ export function PDFReportGenerator() {
           </div>
         </div>
 
+        {/* Debug info - visible only in development */}
+        {process.env.NODE_ENV === 'development' && reportData && (
+          <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg text-sm">
+            <p className="font-medium">Debug Info:</p>
+            <p>Orders: {reportData.sales.length} | Order Items: {reportData.orderItems.length} | Products: {reportData.products.length}</p>
+            <p>Total Sales: {currency.symbol}{reportData.summary.totalSales.toFixed(2)}</p>
+            <button 
+              onClick={debugDatabase}
+              className="mt-2 text-blue-600 hover:underline"
+            >
+              Check Database
+            </button>
+          </div>
+        )}
+
         {/* Report Preview */}
         <div ref={reportRef} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
           {/* Report Header */}
@@ -580,7 +811,9 @@ export function PDFReportGenerator() {
               </div>
               <div className="text-right">
                 <p className="text-sm text-blue-100 dark:text-blue-200">Sales Report</p>
-                <p className="text-lg font-bold">{currency.symbol}{reportData?.summary.totalSales.toFixed(2) || '0.00'}</p>
+                <p className="text-lg font-bold">
+                  {reportData ? `${currency.symbol}${reportData.summary.totalSales.toFixed(2)}` : '0.00'}
+                </p>
               </div>
             </div>
           </div>
@@ -595,7 +828,7 @@ export function PDFReportGenerator() {
                   <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Total Sales</span>
                 </div>
                 <p className="text-lg font-bold text-gray-900 dark:text-white">
-                  {currency.symbol}{reportData?.summary.totalSales.toFixed(2) || '0.00'}
+                  {reportData ? `${currency.symbol}${reportData.summary.totalSales.toFixed(2)}` : '0.00'}
                 </p>
               </div>
               
@@ -605,7 +838,7 @@ export function PDFReportGenerator() {
                   <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Total Profit</span>
                 </div>
                 <p className="text-lg font-bold text-gray-900 dark:text-white">
-                  {currency.symbol}{reportData?.summary.totalProfit.toFixed(2) || '0.00'}
+                  {reportData ? `${currency.symbol}${reportData.summary.totalProfit.toFixed(2)}` : '0.00'}
                 </p>
               </div>
               
@@ -615,7 +848,7 @@ export function PDFReportGenerator() {
                   <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Total Orders</span>
                 </div>
                 <p className="text-lg font-bold text-gray-900 dark:text-white">
-                  {reportData?.summary.totalOrders || 0}
+                  {reportData ? reportData.summary.totalOrders : 0}
                 </p>
               </div>
               
@@ -625,7 +858,7 @@ export function PDFReportGenerator() {
                   <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Products Sold</span>
                 </div>
                 <p className="text-lg font-bold text-gray-900 dark:text-white">
-                  {reportData?.summary.totalProductsSold || 0}
+                  {reportData ? reportData.summary.totalProductsSold : 0}
                 </p>
               </div>
             </div>
@@ -633,161 +866,169 @@ export function PDFReportGenerator() {
             {/* Data Table based on report type */}
             <div className="overflow-x-auto">
               {reportType === 'sales' && (
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 dark:bg-gray-700">
-                    <tr>
-                      <th className="p-3 text-left font-medium">Order #</th>
-                      <th className="p-3 text-left font-medium">Date</th>
-                      <th className="p-3 text-left font-medium">Customer</th>
-                      <th className="p-3 text-left font-medium">Payment</th>
-                      <th className="p-3 text-left font-medium">Amount</th>
-                      <th className="p-3 text-left font-medium">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {paginatedSales.length > 0 ? (
-                      paginatedSales.map((sale) => (
-                        <tr key={sale.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                          <td className="p-3 font-mono text-xs">{sale.order_number || 'N/A'}</td>
-                          <td className="p-3">{format(new Date(sale.created_at), 'MMM d, yyyy')}</td>
-                          <td className="p-3">{sale.customer?.name || 'Walk-in'}</td>
-                          <td className="p-3">
-                            <span className="px-2 py-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
-                              {sale.payment_method || 'Cash'}
-                            </span>
-                          </td>
-                          <td className="p-3 font-medium">
-                            {currency.symbol}{parseFloat(sale.total || 0).toFixed(2)}
-                          </td>
-                          <td className="p-3">
-                            <span className="flex items-center gap-1">
-                              {sale.status === 'completed' ? (
-                                <>
-                                  <FiCheckCircle className="h-3 w-3 text-green-500" />
-                                  <span className="text-green-600 dark:text-green-400">Completed</span>
-                                </>
-                              ) : (
-                                <>
-                                  <FiXCircle className="h-3 w-3 text-red-500" />
-                                  <span className="text-red-600 dark:text-red-400">Cancelled</span>
-                                </>
-                              )}
-                            </span>
+                <>
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 dark:bg-gray-700">
+                      <tr>
+                        <th className="p-3 text-left font-medium">Order #</th>
+                        <th className="p-3 text-left font-medium">Date</th>
+                        <th className="p-3 text-left font-medium">Customer</th>
+                        <th className="p-3 text-left font-medium">Payment</th>
+                        <th className="p-3 text-left font-medium">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                      {paginatedSales.length > 0 ? (
+                        paginatedSales.map((sale) => (
+                          <tr key={sale.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                            <td className="p-3 font-mono text-xs">{sale.order_number || `ORDER-${sale.id?.slice(0, 8) || 'N/A'}`}</td>
+                            <td className="p-3">{format(new Date(sale.created_at), 'MMM d, yyyy')}</td>
+                            <td className="p-3">{sale.customer?.name || 'Walk-in'}</td>
+                            <td className="p-3">
+                              <span className="px-2 py-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+                                {sale.payment_method || 'Cash'}
+                              </span>
+                            </td>
+                            <td className="p-3 font-medium">
+                              {currency.symbol}{parseFloat(sale.total || 0).toFixed(2)}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="5" className="p-8 text-center text-gray-500 dark:text-gray-400">
+                            {reportData?.sales?.length === 0 ? 'No sales data available for this period' : 'Loading sales data...'}
                           </td>
                         </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="6" className="p-8 text-center text-gray-500 dark:text-gray-400">
-                          No sales data available for this period
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                      )}
+                    </tbody>
+                  </table>
+                  {reportData?.sales?.length === 0 && (
+                    <div className="text-center py-8">
+                      <FiAlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-600 dark:text-gray-400">No sales found for the selected period</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
+                        Try selecting a different date range or check if orders have been created.
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
 
               {reportType === 'products' && (
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 dark:bg-gray-700">
-                    <tr>
-                      <th className="p-3 text-left font-medium">Product</th>
-                      <th className="p-3 text-left font-medium">Category</th>
-                      <th className="p-3 text-left font-medium">Quantity Sold</th>
-                      <th className="p-3 text-left font-medium">Unit Price</th>
-                      <th className="p-3 text-left font-medium">Total Sales</th>
-                      <th className="p-3 text-left font-medium">Profit</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {paginatedOrderItems.length > 0 ? (
-                      paginatedOrderItems.map((item) => (
-                        <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                          <td className="p-3 font-medium">{item.product?.name || 'Unknown'}</td>
-                          <td className="p-3">
-                            <span className="px-2 py-1 text-xs rounded-full bg-gray-100 dark:bg-gray-700">
-                              {item.product?.category || 'Uncategorized'}
-                            </span>
-                          </td>
-                          <td className="p-3">{item.quantity}</td>
-                          <td className="p-3">{currency.symbol}{parseFloat(item.unit_price || 0).toFixed(2)}</td>
-                          <td className="p-3 font-medium">
-                            {currency.symbol}{parseFloat(item.total_price || 0).toFixed(2)}
-                          </td>
-                          <td className="p-3">
-                            <span className="text-green-600 dark:text-green-400 font-medium">
-                              {currency.symbol}
-                              {((parseFloat(item.product?.price || item.unit_price || 0) - parseFloat(item.product?.cost || 0)) * item.quantity).toFixed(2)}
-                            </span>
+                <>
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 dark:bg-gray-700">
+                      <tr>
+                        <th className="p-3 text-left font-medium">Product</th>
+                        <th className="p-3 text-left font-medium">Category</th>
+                        <th className="p-3 text-left font-medium">Quantity Sold</th>
+                        <th className="p-3 text-left font-medium">Unit Price</th>
+                        <th className="p-3 text-left font-medium">Total Sales</th>
+                        <th className="p-3 text-left font-medium">Profit</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                      {paginatedOrderItems.length > 0 ? (
+                        paginatedOrderItems.map((item) => (
+                          <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                            <td className="p-3 font-medium">{item.product?.name || 'Unknown Product'}</td>
+                            <td className="p-3">
+                              <span className="px-2 py-1 text-xs rounded-full bg-gray-100 dark:bg-gray-700">
+                                {item.product?.category || 'Uncategorized'}
+                              </span>
+                            </td>
+                            <td className="p-3">{item.quantity || 0}</td>
+                            <td className="p-3">{currency.symbol}{parseFloat(item.unit_price || 0).toFixed(2)}</td>
+                            <td className="p-3 font-medium">
+                              {currency.symbol}{parseFloat(item.total_price || 0).toFixed(2)}
+                            </td>
+                            <td className="p-3">
+                              <span className="text-green-600 dark:text-green-400 font-medium">
+                                {currency.symbol}
+                                {((parseFloat(item.product?.price || item.unit_price || 0) - parseFloat(item.product?.cost || 0)) * (item.quantity || 0)).toFixed(2)}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="6" className="p-8 text-center text-gray-500 dark:text-gray-400">
+                            {reportData?.orderItems?.length === 0 ? 'No product sales data available' : 'Loading product data...'}
                           </td>
                         </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="6" className="p-8 text-center text-gray-500 dark:text-gray-400">
-                          No product sales data available
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                      )}
+                    </tbody>
+                  </table>
+                  {reportData?.orderItems?.length === 0 && reportData?.sales?.length > 0 && (
+                    <div className="text-center py-8">
+                      <FiAlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-600 dark:text-gray-400">No product details found for sales</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
+                        This might indicate missing order_items records for the orders.
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
 
               {reportType === 'inventory' && (
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 dark:bg-gray-700">
-                    <tr>
-                      <th className="p-3 text-left font-medium">Product</th>
-                      <th className="p-3 text-left font-medium">SKU</th>
-                      <th className="p-3 text-left font-medium">Current Stock</th>
-                      <th className="p-3 text-left font-medium">Min Stock</th>
-                      <th className="p-3 text-left font-medium">Status</th>
-                      <th className="p-3 text-left font-medium">Cost</th>
-                      <th className="p-3 text-left font-medium">Price</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {paginatedProducts.length > 0 ? (
-                      paginatedProducts.map((product) => (
-                        <tr key={product.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                          <td className="p-3 font-medium">{product.name}</td>
-                          <td className="p-3 font-mono text-xs">{product.sku || 'N/A'}</td>
-                          <td className="p-3">{product.stock_quantity}</td>
-                          <td className="p-3">{product.min_stock_level}</td>
-                          <td className="p-3">
-                            <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                              product.stock_quantity <= product.min_stock_level
-                                ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
-                                : 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
-                            }`}>
-                              {product.stock_quantity <= product.min_stock_level ? (
-                                <>
-                                  <FiXCircle className="h-3 w-3" />
-                                  Low Stock
-                                </>
-                              ) : (
-                                <>
-                                  <FiCheckCircle className="h-3 w-3" />
-                                  In Stock
-                                </>
-                              )}
-                            </span>
-                          </td>
-                          <td className="p-3">{currency.symbol}{parseFloat(product.cost || 0).toFixed(2)}</td>
-                          <td className="p-3 font-medium">
-                            {currency.symbol}{parseFloat(product.price || 0).toFixed(2)}
+                <>
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 dark:bg-gray-700">
+                      <tr>
+                        <th className="p-3 text-left font-medium">Product</th>
+                        <th className="p-3 text-left font-medium">SKU</th>
+                        <th className="p-3 text-left font-medium">Current Stock</th>
+                        <th className="p-3 text-left font-medium">Min Stock</th>
+                        <th className="p-3 text-left font-medium">Status</th>
+                        <th className="p-3 text-left font-medium">Cost</th>
+                        <th className="p-3 text-left font-medium">Price</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                      {paginatedProducts.length > 0 ? (
+                        paginatedProducts.map((product) => (
+                          <tr key={product.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                            <td className="p-3 font-medium">{product.name}</td>
+                            <td className="p-3 font-mono text-xs">{product.sku || 'N/A'}</td>
+                            <td className="p-3">{product.stock_quantity || 0}</td>
+                            <td className="p-3">{product.min_stock_level || 0}</td>
+                            <td className="p-3">
+                              <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                                (product.stock_quantity || 0) <= (product.min_stock_level || 0)
+                                  ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
+                                  : 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
+                              }`}>
+                                {(product.stock_quantity || 0) <= (product.min_stock_level || 0) ? (
+                                  <>
+                                    <FiXCircle className="h-3 w-3" />
+                                    Low Stock
+                                  </>
+                                ) : (
+                                  <>
+                                    <FiCheckCircle className="h-3 w-3" />
+                                    In Stock
+                                  </>
+                                )}
+                              </span>
+                            </td>
+                            <td className="p-3">{currency.symbol}{parseFloat(product.cost || 0).toFixed(2)}</td>
+                            <td className="p-3 font-medium">
+                              {currency.symbol}{parseFloat(product.price || 0).toFixed(2)}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="7" className="p-8 text-center text-gray-500 dark:text-gray-400">
+                            {reportData?.products?.length === 0 ? 'No inventory data available' : 'Loading inventory data...'}
                           </td>
                         </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="7" className="p-8 text-center text-gray-500 dark:text-gray-400">
-                          No inventory data available
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                      )}
+                    </tbody>
+                  </table>
+                </>
               )}
             </div>
 
@@ -796,14 +1037,14 @@ export function PDFReportGenerator() {
               <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <div className="text-sm text-gray-600 dark:text-gray-400">
                   Showing {indexOfFirstItem + 1} to {Math.min(
-                    reportType === 'sales' ? reportData.sales.length :
-                    reportType === 'products' ? reportData.products.length :
-                    reportData.orderItems.length,
+                    reportType === 'sales' ? (reportData?.sales?.length || 0) :
+                    reportType === 'products' ? (reportData?.orderItems?.length || 0) :
+                    (reportData?.products?.length || 0),
                     indexOfLastItem
                   )} of {
-                    reportType === 'sales' ? reportData.sales.length :
-                    reportType === 'products' ? reportData.products.length :
-                    reportData.orderItems.length
+                    reportType === 'sales' ? (reportData?.sales?.length || 0) :
+                    reportType === 'products' ? (reportData?.orderItems?.length || 0) :
+                    (reportData?.products?.length || 0)
                   } entries
                 </div>
                 <div className="flex items-center gap-2">
