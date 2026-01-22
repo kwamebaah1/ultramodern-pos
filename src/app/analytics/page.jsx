@@ -467,7 +467,6 @@ export default function AnalyticsPage() {
           </Card>
         </div>
       </div>
-      <PDFReportGenerator/>
     </div>
   );
 }
