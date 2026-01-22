@@ -15,6 +15,7 @@ import { SalesTrendChart } from '@/components/analytics/SalesTrendChart';
 import { RevenueBreakdownChart } from '@/components/analytics/RevenueBreakdownChart';
 import { TopProductsChart } from '@/components/analytics/TopProductsChart';
 import { CustomerActivityTable } from '@/components/analytics/CustomerActivityTable';
+import { BusinessSummary } from '@/components/analytics/BusinessSummary';
 import { supabase } from '@/lib/supabase/client';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { CURRENCIES } from '@/components/currencies/Currency';
@@ -298,6 +299,16 @@ export default function AnalyticsPage() {
           </button>
         </div>
       </div>
+
+      <div className="sm:hidden">
+        <DateRangePicker 
+          value={dateRange}
+          onChange={setDateRange}
+          size="sm"
+        />
+      </div>
+
+      <BusinessSummary />
 
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
