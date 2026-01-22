@@ -783,21 +783,6 @@ export function PDFReportGenerator() {
           </div>
         </div>
 
-        {/* Debug info - visible only in development */}
-        {process.env.NODE_ENV === 'development' && reportData && (
-          <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg text-sm">
-            <p className="font-medium">Debug Info:</p>
-            <p>Orders: {reportData.sales.length} | Order Items: {reportData.orderItems.length} | Products: {reportData.products.length}</p>
-            <p>Total Sales: {currency.symbol}{reportData.summary.totalSales.toFixed(2)}</p>
-            <button 
-              onClick={debugDatabase}
-              className="mt-2 text-blue-600 hover:underline"
-            >
-              Check Database
-            </button>
-          </div>
-        )}
-
         {/* Report Preview */}
         <div ref={reportRef} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
           {/* Report Header */}
