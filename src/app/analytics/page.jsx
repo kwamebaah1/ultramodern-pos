@@ -16,6 +16,7 @@ import { RevenueBreakdownChart } from '@/components/analytics/RevenueBreakdownCh
 import { TopProductsChart } from '@/components/analytics/TopProductsChart';
 import { CustomerActivityTable } from '@/components/analytics/CustomerActivityTable';
 import { BusinessSummary } from '@/components/analytics/BusinessSummary';
+import { PDFReportGenerator } from '@/components/analytics/PDFReportGenerator';
 import { supabase } from '@/lib/supabase/client';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { CURRENCIES } from '@/components/currencies/Currency';
@@ -310,6 +311,8 @@ export default function AnalyticsPage() {
 
       <BusinessSummary />
 
+      <PDFReportGenerator />
+
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {isLoading ? (
@@ -464,6 +467,7 @@ export default function AnalyticsPage() {
           </Card>
         </div>
       </div>
+      <PDFReportGenerator/>
     </div>
   );
 }
