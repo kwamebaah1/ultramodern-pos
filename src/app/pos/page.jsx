@@ -24,43 +24,71 @@ export default function PosPage() {
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
   const [currency, setCurrency] = useState({ symbol: 'GH₵' });
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [taxRate, setTaxRate] = useState(10);
+  const [storeId, setStoreId] = useState(null);
   const router = useRouter();
 
-  // Fetch products
+  // Fetch store settings including tax rate and currency
   useEffect(() => {
-    const fetchProducts = async () => {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
+    const fetchStoreSettings = async () => {
+      try {
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
 
-      if (userError || !user) {
-        console.error('User not found:', userError);
-        return;
+        if (userError || !user) {
+          console.error('User not found:', userError);
+          return;
+        }
+
+        const { data: profile, error: profileError } = await supabase
+          .from('users')
+          .select('store_id')
+          .eq('auth_user_id', user.id)
+          .single();
+
+        if (profileError || !profile?.store_id) {
+          console.error('Failed to fetch store_id:', profileError);
+          return;
+        }
+
+        const storeId = profile.store_id;
+        setStoreId(storeId);
+
+        // Fetch store settings including tax rate
+        const { data: storeData, error: storeError } = await supabase
+          .from('stores')
+          .select('currency, tax_rate')
+          .eq('id', storeId)
+          .single();
+
+        if (!storeError && storeData) {
+          // Set tax rate (default to 0 if not set)
+          const storeTaxRate = storeData.tax_rate || 0;
+          setTaxRate(storeTaxRate);
+          
+          // Set currency
+          const currentCurrency = CURRENCIES.find(c => c.code === (storeData?.currency || 'GHS'));
+          setCurrency(currentCurrency || CURRENCIES.find(c => c.code === 'GHS'));
+          
+          // Fetch products after we have store settings
+          fetchProducts(storeId);
+        }
+      } catch (error) {
+        console.error('Error fetching store settings:', error);
+        // Fallback values
+        setTaxRate(10);
+        setCurrency(CURRENCIES.find(c => c.code === 'GHS'));
       }
+    };
 
-      const { data: profile, error: profileError } = await supabase
-        .from('users')
-        .select('store_id')
-        .eq('auth_user_id', user.id)
-        .single();
+    fetchStoreSettings();
+  }, []);
 
-      if (profileError || !profile?.store_id) {
-        console.error('Failed to fetch store_id:', profileError);
-        return;
-      }
-
-      const storeId = profile.store_id;
-
-      const { data: storeData } = await supabase
-        .from('stores')
-        .select('currency')
-        .eq('id', storeId)
-        .single();
-
-      const currentCurrency = CURRENCIES.find(c => c.code === (storeData?.currency || 'GHS'));
-      setCurrency(currentCurrency || CURRENCIES.find(c => c.code === 'GHS'));
-
+  // Fetch products
+  const fetchProducts = async (storeId) => {
+    try {
       const { data, error } = await supabase
         .from('products')
         .select('*')
@@ -72,10 +100,10 @@ export default function PosPage() {
         setProducts(data);
         setFilteredProducts(data);
       }
-    };
-
-    fetchProducts();
-  }, []);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+    }
+  };
 
   // Filter products based on search
   useEffect(() => {
@@ -91,9 +119,14 @@ export default function PosPage() {
     }
   }, [searchTerm, products]);
 
-  // Calculate cart totals
+  // Calculate cart totals with dynamic tax
+  const calculateTax = (amount) => {
+    if (!taxRate || taxRate <= 0) return 0;
+    return (amount * taxRate) / 100;
+  };
+
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const tax = subtotal * 0.1;
+  const tax = calculateTax(subtotal);
   const total = subtotal + tax;
 
   // Cart functions
@@ -157,15 +190,6 @@ export default function PosPage() {
 
       if (userError || !user) throw userError;
 
-      const { data: profile, error: profileError } = await supabase
-        .from('users')
-        .select('store_id')
-        .eq('auth_user_id', user.id)
-        .single();
-
-      if (profileError || !profile?.store_id) throw profileError;
-
-      const storeId = profile.store_id;
       // Update customer loyalty points if applicable
       if (customer?.id) {
         await supabase
@@ -221,7 +245,7 @@ export default function PosPage() {
       router.push(`/orders/${order.id}`);
     } catch (error) {
       console.error('Checkout error:', error);
-      alert('There was an error processing your order. Please try again.');
+      toast.error('There was an error processing your order. Please try again.');
     }
   };
 
@@ -259,6 +283,17 @@ export default function PosPage() {
 
       {/* Product Selection Panel */}
       <div className={`w-full md:w-2/3 p-4 flex flex-col ${isCartOpen ? 'hidden md:flex' : 'flex'}`}>
+        {/* Tax Rate Indicator */}
+        <div className="mb-2">
+          <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 dark:bg-gray-800">
+            {taxRate > 0 ? (
+              <span>Current Tax Rate: {taxRate}%</span>
+            ) : (
+              <span>Tax: Disabled</span>
+            )}
+          </div>
+        </div>
+
         <div className="mb-4">
           <Input
             placeholder="Search products..."
@@ -353,20 +388,42 @@ export default function PosPage() {
               <span>Subtotal:</span>
               <span>{formatCurrency(subtotal)}</span>
             </div>
+            
+            {/* Dynamic Tax Display */}
             <div className="flex justify-between">
-              <span>Tax (10%):</span>
-              <span>{formatCurrency(tax)}</span>
+              <span>Tax {taxRate > 0 ? `(${taxRate}%)` : ''}:</span>
+              <span>
+                {formatCurrency(tax)}
+                {taxRate === 0 && ' (Disabled)'}
+              </span>
             </div>
+            
             {customer?.loyalty_points !== undefined && (
               <div className="flex justify-between text-blue-600 dark:text-blue-400">
                 <span>Loyalty Points:</span>
                 <span>{customer.loyalty_points} (+{Math.floor(total / 10)})</span>
               </div>
             )}
-            <div className="flex justify-between font-bold text-lg">
+            
+            <div className="flex justify-between font-bold text-lg border-t pt-2">
               <span>Total:</span>
               <span>{formatCurrency(total)}</span>
             </div>
+
+            {/* Tax Configuration Note */}
+            {taxRate > 0 && (
+              <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                <p>Tax rate configured in Store Settings: {taxRate}%</p>
+                <p className="mt-1">
+                  <a 
+                    href="/settings" 
+                    className="text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    Change tax settings
+                  </a>
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-2">
