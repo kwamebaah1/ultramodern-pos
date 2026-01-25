@@ -325,7 +325,7 @@ export default function ReportsPage() {
         <div className="flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-900/20 dark:to-emerald-900/20 rounded-full">
           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
           <span className="text-sm font-medium text-green-700 dark:text-green-400">
-            Premium Plan • Full Access
+            Full Access
           </span>
         </div>
       </div>
