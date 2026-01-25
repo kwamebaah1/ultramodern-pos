@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { 
   FiHome, FiShoppingCart, FiPieChart, 
   FiUsers, FiSettings, FiSun, FiMoon, 
-  FiShoppingBag, FiLock
+  FiShoppingBag, FiLock, FiBarChart2
 } from 'react-icons/fi';
 import { HiOutlineClipboardList } from 'react-icons/hi';
 import { useTheme } from 'next-themes';
@@ -18,6 +18,7 @@ const navItems = [
   { name: 'Dashboard', href: '/', icon: FiHome },
   { name: 'POS', href: '/pos', icon: FiShoppingCart },
   { name: 'Analytics', href: '/analytics', icon: FiPieChart, premium: true },
+  { name: 'Reports', href: '/report', icon: FiBarChart2, premium: true },
   { name: 'Customers', href: '/customers', icon: FiUsers },
   { name: 'Inventory', href: '/products', icon: FiPieChart },
   { name: 'Orders', href: '/orders', icon: HiOutlineClipboardList },
