@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   FiFileText, 
   FiPrinter, 
@@ -17,15 +17,155 @@ import {
   FiAlertCircle,
   FiRefreshCw,
   FiBarChart2,
+  FiChevronDown,
+  FiChevronUp,
+  FiClock,
+  FiSun,
+  FiMoon
 } from 'react-icons/fi';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { DateRangePicker } from '@/components/ui/DateRangePicker';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { supabase } from '@/lib/supabase/client';
-import { format, startOfMonth, endOfMonth, subMonths, startOfDay, endOfDay } from 'date-fns';
+import { 
+  format, 
+  startOfMonth, 
+  endOfMonth, 
+  subMonths, 
+  startOfDay, 
+  endOfDay,
+  startOfWeek,
+  endOfWeek,
+  subDays,
+  startOfYear,
+  endOfYear,
+  subYears,
+  isSameDay,
+  differenceInDays
+} from 'date-fns';
 import { CURRENCIES } from '@/components/currencies/Currency';
 import PdfDownloadButton from './PdfDownloadButton';
+
+// Date preset configurations
+const DATE_PRESETS = [
+  {
+    id: 'today',
+    label: 'Today',
+    getRange: () => {
+      const today = new Date();
+      return { start: startOfDay(today), end: endOfDay(today) };
+    },
+    icon: FiSun,
+    color: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
+    badge: 'Today'
+  },
+  {
+    id: 'yesterday',
+    label: 'Yesterday',
+    getRange: () => {
+      const yesterday = subDays(new Date(), 1);
+      return { start: startOfDay(yesterday), end: endOfDay(yesterday) };
+    },
+    icon: FiMoon,
+    color: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300',
+    badge: 'Yesterday'
+  },
+  {
+    id: 'thisWeek',
+    label: 'This Week',
+    getRange: () => {
+      const today = new Date();
+      return { start: startOfWeek(today, { weekStartsOn: 1 }), end: endOfWeek(today, { weekStartsOn: 1 }) };
+    },
+    icon: FiClock,
+    color: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
+    badge: 'This Week'
+  },
+  {
+    id: 'lastWeek',
+    label: 'Last Week',
+    getRange: () => {
+      const today = new Date();
+      const lastWeek = subDays(today, 7);
+      return { 
+        start: startOfWeek(lastWeek, { weekStartsOn: 1 }), 
+        end: endOfWeek(lastWeek, { weekStartsOn: 1 }) 
+      };
+    },
+    icon: FiClock,
+    color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300',
+    badge: 'Last Week'
+  },
+  {
+    id: 'thisMonth',
+    label: 'This Month',
+    getRange: () => {
+      const today = new Date();
+      return { start: startOfMonth(today), end: endOfMonth(today) };
+    },
+    icon: FiCalendar,
+    color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300',
+    badge: 'This Month'
+  },
+  {
+    id: 'lastMonth',
+    label: 'Last Month',
+    getRange: () => {
+      const today = new Date();
+      const lastMonth = subMonths(today, 1);
+      return { start: startOfMonth(lastMonth), end: endOfMonth(lastMonth) };
+    },
+    icon: FiCalendar,
+    color: 'bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-300',
+    badge: 'Last Month'
+  },
+  {
+    id: 'last3Months',
+    label: 'Last 3 Months',
+    getRange: () => {
+      const today = new Date();
+      return { start: startOfMonth(subMonths(today, 3)), end: endOfMonth(today) };
+    },
+    icon: FiTrendingUp,
+    color: 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300',
+    badge: '3 Months'
+  },
+  {
+    id: 'last6Months',
+    label: 'Last 6 Months',
+    getRange: () => {
+      const today = new Date();
+      return { start: startOfMonth(subMonths(today, 6)), end: endOfMonth(today) };
+    },
+    icon: FiBarChart2,
+    color: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
+    badge: '6 Months'
+  },
+  {
+    id: 'thisYear',
+    label: 'This Year',
+    getRange: () => {
+      const today = new Date();
+      return { start: startOfYear(today), end: endOfYear(today) };
+    },
+    icon: FiCalendar,
+    color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-300',
+    badge: 'This Year'
+  },
+  {
+    id: 'lastYear',
+    label: 'Last Year',
+    getRange: () => {
+      const today = new Date();
+      const lastYear = subYears(today, 1);
+      return { start: startOfYear(lastYear), end: endOfYear(lastYear) };
+    },
+    icon: FiCalendar,
+    color: 'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300',
+    badge: 'Last Year'
+  }
+];
 
 export function EnhancedReportGenerator() {
   const [dateRange, setDateRange] = useState({
@@ -41,6 +181,40 @@ export function EnhancedReportGenerator() {
   const [error, setError] = useState(null);
   const [storeId, setStoreId] = useState(null);
   const [storeName, setStoreName] = useState('');
+  const [showDatePresets, setShowDatePresets] = useState(false);
+  const [activePreset, setActivePreset] = useState('thisMonth');
+  const [customRangeLabel, setCustomRangeLabel] = useState('Custom Range');
+  const datePickerRef = useRef(null);
+
+  // Update custom range label whenever date range changes
+  useEffect(() => {
+    const daysDiff = differenceInDays(dateRange.end, dateRange.start);
+    let label = 'Custom Range';
+    
+    if (daysDiff === 0) {
+      label = format(dateRange.start, 'MMMM d, yyyy');
+    } else if (daysDiff === 6 && isSameDay(dateRange.start, startOfWeek(dateRange.start, { weekStartsOn: 1 }))) {
+      label = `${format(dateRange.start, 'MMM d')} - ${format(dateRange.end, 'MMM d, yyyy')}`;
+    } else if (daysDiff <= 30) {
+      label = `${format(dateRange.start, 'MMM d')} - ${format(dateRange.end, 'MMM d')}`;
+    } else {
+      label = `${format(dateRange.start, 'MMM yyyy')} - ${format(dateRange.end, 'MMM yyyy')}`;
+    }
+    
+    setCustomRangeLabel(label);
+    
+    // Check if current range matches any preset
+    const matchingPreset = DATE_PRESETS.find(preset => {
+      const presetRange = preset.getRange();
+      return isSameDay(presetRange.start, dateRange.start) && isSameDay(presetRange.end, dateRange.end);
+    });
+    
+    if (matchingPreset) {
+      setActivePreset(matchingPreset.id);
+    } else {
+      setActivePreset('custom');
+    }
+  }, [dateRange]);
 
   const fetchReportData = async () => {
     setIsLoading(true);
@@ -262,17 +436,30 @@ export function EnhancedReportGenerator() {
     setCurrentPage(1);
   };
 
-  const handleQuickDateSelect = (months) => {
-    const today = new Date();
-    setDateRange({
-      start: startOfMonth(subMonths(today, months)),
-      end: endOfMonth(today)
-    });
+  const handlePresetSelect = (presetId) => {
+    const preset = DATE_PRESETS.find(p => p.id === presetId);
+    if (preset) {
+      setDateRange(preset.getRange());
+      setActivePreset(presetId);
+      setShowDatePresets(false);
+    }
   };
 
   const formatCurrency = (amount) => {
     return `${currency.symbol}${parseFloat(amount || 0).toFixed(2)}`;
   };
+
+  // Calculate date range statistics
+  const getDateRangeStats = () => {
+    const days = differenceInDays(dateRange.end, dateRange.start) + 1;
+    const isSingleDay = days === 1;
+    const isWeek = days === 7;
+    const isMonth = days >= 28 && days <= 31;
+    
+    return { days, isSingleDay, isWeek, isMonth };
+  };
+
+  const dateStats = getDateRangeStats();
 
   if (isLoading) {
     return (
@@ -343,35 +530,122 @@ export function EnhancedReportGenerator() {
             </div>
           </div>
 
-          {/* Controls */}
+          {/* Enhanced Controls */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Date Selection */}
+            {/* Enhanced Date Selection */}
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  <FiCalendar className="inline mr-2" />
-                  Report Period
-                </label>
-                <DateRangePicker
-                  value={dateRange}
-                  onChange={handleDateChange}
-                  className="w-full"
-                />
-              </div>
-              
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" onClick={() => handleQuickDateSelect(0)}>
-                  This Month
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => handleQuickDateSelect(1)}>
-                  Last Month
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => handleQuickDateSelect(3)}>
-                  Last 3 Months
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => handleQuickDateSelect(6)}>
-                  Last 6 Months
-                </Button>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <FiCalendar className="inline mr-2" />
+                    Report Period
+                  </label>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    {dateStats.days} {dateStats.days === 1 ? 'day' : 'days'}
+                  </div>
+                </div>
+                
+                {/* Date Presets Dropdown */}
+                <div className="relative" ref={datePickerRef}>
+                  <Button
+                    onClick={() => setShowDatePresets(!showDatePresets)}
+                    variant="outline"
+                    className="w-full justify-between"
+                  >
+                    <div className="flex items-center gap-2">
+                      {activePreset === 'custom' ? (
+                        <span className="font-medium">{customRangeLabel}</span>
+                      ) : (
+                        <>
+                          <span className={`px-2 py-1 text-xs rounded-full ${DATE_PRESETS.find(p => p.id === activePreset)?.color || 'bg-gray-100 text-gray-700'}`}>
+                            {DATE_PRESETS.find(p => p.id === activePreset)?.badge}
+                          </span>
+                          <span>{DATE_PRESETS.find(p => p.id === activePreset)?.label}</span>
+                        </>
+                      )}
+                    </div>
+                    {showDatePresets ? <FiChevronUp /> : <FiChevronDown />}
+                  </Button>
+                  
+                  {showDatePresets && (
+                    <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 max-h-80 overflow-y-auto">
+                      <div className="p-2">
+                        <div className="mb-2 px-2 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Quick Select
+                        </div>
+                        {DATE_PRESETS.map((preset) => {
+                          const Icon = preset.icon;
+                          return (
+                            <button
+                              key={preset.id}
+                              onClick={() => handlePresetSelect(preset.id)}
+                              className={`w-full text-left px-3 py-2 rounded-md flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-700 mb-1 ${
+                                activePreset === preset.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <Icon className="h-4 w-4 text-gray-400" />
+                                <span className="text-sm">{preset.label}</span>
+                              </div>
+                              <span className={`px-2 py-0.5 text-xs rounded-full ${preset.color}`}>
+                                {preset.badge}
+                              </span>
+                            </button>
+                          );
+                        })}
+                        
+                        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                          <div className="mb-2 px-2 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Custom Range
+                          </div>
+                          <DateRangePicker
+                            value={dateRange}
+                            onChange={(newRange) => {
+                              handleDateChange(newRange);
+                              setShowDatePresets(false);
+                            }}
+                            className="w-full"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Selected Date Range Display */}
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Selected Period
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      {format(dateRange.start, 'MMM d')} - {format(dateRange.end, 'MMM d, yyyy')}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="text-gray-600 dark:text-gray-400">
+                      Start: {format(dateRange.start, 'EEE, MMM d, yyyy')}
+                    </div>
+                    <div className="text-gray-600 dark:text-gray-400">
+                      End: {format(dateRange.end, 'EEE, MMM d, yyyy')}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Quick Action Buttons */}
+                <div className="grid grid-cols-4 gap-2">
+                  {DATE_PRESETS.slice(0, 4).map((preset) => (
+                    <Button
+                      key={preset.id}
+                      size="sm"
+                      variant={activePreset === preset.id ? 'primary' : 'outline'}
+                      onClick={() => handlePresetSelect(preset.id)}
+                      className="text-xs"
+                    >
+                      {preset.badge}
+                    </Button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -419,32 +693,81 @@ export function EnhancedReportGenerator() {
                   Summary
                 </Button>
               </div>
+              
+              {/* Date Stats */}
+              {reportData && (
+                <div className="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/10 dark:to-indigo-900/10 rounded-lg p-3">
+                  <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                    Period Performance
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">
+                        {reportData.summary.totalOrders} orders
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-500">
+                        {dateStats.isSingleDay ? 'Today' : `Over ${dateStats.days} days`}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-medium text-green-600 dark:text-green-400">
+                        {formatCurrency(reportData.summary.totalSales)}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-500">
+                        Total revenue
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Quick Stats */}
-            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
-              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-                Quick Stats
+            <div className="bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-800 dark:to-blue-900/10 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                <FiCalendar className="h-4 w-4" />
+                Report Summary
               </h3>
               {reportData ? (
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">Store:</span>
-                    <span className="text-sm font-medium truncate ml-2">{storeName}</span>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-2 bg-white/50 dark:bg-gray-700/50 rounded">
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Store</div>
+                      <div className="text-sm font-medium truncate">{storeName}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Currency</div>
+                      <div className="text-sm font-medium">{currency.symbol}</div>
+                    </div>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">Orders:</span>
-                    <span className="text-sm font-medium">{reportData.summary.totalOrders}</span>
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-white/50 dark:bg-gray-700/50 rounded p-2">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Orders</div>
+                      <div className="text-lg font-bold text-gray-900 dark:text-white">
+                        {reportData.summary.totalOrders}
+                      </div>
+                    </div>
+                    <div className="bg-white/50 dark:bg-gray-700/50 rounded p-2">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Revenue</div>
+                      <div className="text-lg font-bold text-green-600 dark:text-green-400">
+                        {formatCurrency(reportData.summary.totalSales)}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">Revenue:</span>
-                    <span className="text-sm font-medium text-green-600 dark:text-green-400">
-                      {formatCurrency(reportData.summary.totalSales)}
-                    </span>
+                  
+                  <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                    Data for {format(dateRange.start, 'MMM d')} - {format(dateRange.end, 'MMM d')}
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-gray-500 dark:text-gray-400">No data available</p>
+                <div className="text-center py-4">
+                  <div className="text-gray-400 dark:text-gray-500 mb-2">No data available</div>
+                  <Button size="xs" variant="outline" onClick={fetchReportData}>
+                    <FiRefreshCw className="h-3 w-3 mr-1" />
+                    Refresh
+                  </Button>
+                </div>
               )}
             </div>
           </div>
@@ -456,11 +779,16 @@ export function EnhancedReportGenerator() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-900/10">
             <div className="p-4">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-blue-100 dark:bg-blue-800 rounded-lg">
-                  <FiDollarSign className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 dark:bg-blue-800 rounded-lg">
+                    <FiDollarSign className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Revenue</span>
                 </div>
-                <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Revenue</span>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {dateStats.isSingleDay ? 'Today' : `${dateStats.days} days`}
+                </div>
               </div>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
                 {formatCurrency(reportData.summary.totalSales)}
@@ -474,11 +802,16 @@ export function EnhancedReportGenerator() {
 
           <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-900/10">
             <div className="p-4">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-green-100 dark:bg-green-800 rounded-lg">
-                  <FiTrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-100 dark:bg-green-800 rounded-lg">
+                    <FiTrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  </div>
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Profit</span>
                 </div>
-                <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Profit</span>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  Margin
+                </div>
               </div>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
                 {formatCurrency(reportData.summary.totalProfit)}
@@ -493,11 +826,16 @@ export function EnhancedReportGenerator() {
 
           <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-900/10">
             <div className="p-4">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-purple-100 dark:bg-purple-800 rounded-lg">
-                  <FiShoppingBag className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-purple-100 dark:bg-purple-800 rounded-lg">
+                    <FiShoppingBag className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Orders</span>
                 </div>
-                <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Orders</span>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {dateStats.days} days
+                </div>
               </div>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
                 {reportData.summary.totalOrders}
@@ -510,11 +848,16 @@ export function EnhancedReportGenerator() {
 
           <Card className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-900/10">
             <div className="p-4">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-amber-100 dark:bg-amber-800 rounded-lg">
-                  <FiPackage className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-amber-100 dark:bg-amber-800 rounded-lg">
+                    <FiPackage className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Products Sold</span>
                 </div>
-                <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Products Sold</span>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  Units
+                </div>
               </div>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
                 {reportData.summary.totalProductsSold}
@@ -531,13 +874,21 @@ export function EnhancedReportGenerator() {
       {reportData && (
         <Card>
           <div className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {reportType === 'sales' && 'Sales Transactions'}
-                {reportType === 'products' && 'Product Sales'}
-                {reportType === 'inventory' && 'Inventory Status'}
-                {reportType === 'summary' && 'Business Summary'}
-              </h3>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {reportType === 'sales' && 'Sales Transactions'}
+                  {reportType === 'products' && 'Product Sales'}
+                  {reportType === 'inventory' && 'Inventory Status'}
+                  {reportType === 'summary' && 'Business Summary'}
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  {format(dateRange.start, 'MMM d, yyyy')} - {format(dateRange.end, 'MMM d, yyyy')}
+                  {reportData && reportType === 'sales' && ` • ${reportData.summary.totalOrders} orders`}
+                  {reportData && reportType === 'products' && ` • ${reportData.summary.totalProductsSold} units sold`}
+                  {reportData && reportType === 'inventory' && ` • ${reportData.products.length} products`}
+                </p>
+              </div>
               
               {totalPages > 1 && (
                 <div className="flex items-center gap-2">
@@ -549,7 +900,7 @@ export function EnhancedReportGenerator() {
                   >
                     <FiChevronLeft />
                   </Button>
-                  <span className="px-3 py-1 text-sm font-medium">
+                  <span className="px-3 py-1 text-sm font-medium bg-gray-100 dark:bg-gray-800 rounded">
                     Page {currentPage} of {totalPages}
                   </span>
                   <Button
@@ -605,7 +956,7 @@ export function EnhancedReportGenerator() {
                 ) : (
                   <tr>
                     <td colSpan="5" className="p-8 text-center text-gray-500 dark:text-gray-400">
-                      No sales data available
+                      No sales data available for this period
                     </td>
                   </tr>
                 )}
@@ -655,7 +1006,7 @@ export function EnhancedReportGenerator() {
                 ) : (
                   <tr>
                     <td colSpan="6" className="p-8 text-center text-gray-500 dark:text-gray-400">
-                      No product sales data available
+                      No product sales data available for this period
                     </td>
                   </tr>
                 )}
