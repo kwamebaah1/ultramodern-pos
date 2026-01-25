@@ -20,13 +20,16 @@ export default function StoreSettings({ storeData }) {
   const [formData, setFormData] = useState({
     name: storeData?.name || '',
     currency: storeData?.currency || 'GHS',
-    // Add other store settings fields as needed
+    tax_rate: storeData?.tax_rate || 0.00,
   });
   const [isSaving, setIsSaving] = useState(false);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    const { name, value, type } = e.target;
+    setFormData(prev => ({ 
+      ...prev, 
+      [name]: type === 'number' ? parseFloat(value) : value 
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -39,6 +42,7 @@ export default function StoreSettings({ storeData }) {
         .update({
           name: formData.name,
           currency: formData.currency,
+          tax_rate: formData.tax_rate,
           updated_at: new Date().toISOString(),
         })
         .eq('id', storeData.id);
@@ -90,10 +94,25 @@ export default function StoreSettings({ storeData }) {
                   This will affect all prices and monetary values in your store.
                 </p>
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Tax Percentage
+                </label>
+                <Input
+                  label="Tax Rate (%)"
+                  name="tax_rate"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={formData.tax_rate}
+                  onChange={handleChange}
+                  helperText="Enter 0 to disable tax, or any percentage value (e.g., 10 for 10%)"
+                />
+              </div>
             </div>
           </div>
-          
-          {/* Add more settings sections as needed */}
         </div>
         
         <div className="mt-8 flex justify-end">
