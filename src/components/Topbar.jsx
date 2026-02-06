@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { 
   FiHome, FiShoppingCart, FiPieChart, 
   FiUsers, FiSettings, FiSun, FiMoon, 
-  FiShoppingBag, FiMenu, FiX, FiLock, FiBarChart2
+  FiShoppingBag, FiMenu, FiX, FiLock, FiBarChart2, FiLogOut
 } from 'react-icons/fi';
 import { HiOutlineClipboardList } from 'react-icons/hi';
 import { useTheme } from 'next-themes';
@@ -27,6 +27,7 @@ const navItems = [
 
 export default function Topbar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [storePlan, setStorePlan] = useState(null);
@@ -63,6 +64,23 @@ export default function Topbar() {
       position: 'top-right',
     });
     setIsMenuOpen(false);
+  };
+
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      toast.success('Logged out successfully', {
+        position: 'top-right',
+      });
+      setIsMenuOpen(false);
+      router.push('/login');
+    } catch (error) {
+      toast.error('Failed to logout', {
+        position: 'top-right',
+      });
+      console.error('Logout error:', error);
+    }
   };
 
   return (
@@ -104,7 +122,7 @@ export default function Topbar() {
 
       {/* Mobile menu */}
       {isMenuOpen && (
-        <div className="px-2 pt-2 pb-4 space-y-1 bg-white dark:bg-gray-800">
+        <div className="px-2 pt-2 pb-4 space-y-1 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
           {navItems.map((item) => {
             const isPremiumLocked = item.premium && storePlan === 'basic';
             const isActive = pathname === item.href;
@@ -141,6 +159,36 @@ export default function Topbar() {
               </div>
             );
           })}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setTheme(theme === 'dark' ? 'light' : 'dark');
+                setIsMenuOpen(false);
+              }}
+              className="w-full justify-start text-gray-700 dark:text-gray-300"
+            >
+              {theme === 'dark' ? (
+                <>
+                  <FiSun className="mr-3 h-5 w-5" />
+                  Light Mode
+                </>
+              ) : (
+                <>
+                  <FiMoon className="mr-3 h-5 w-5" />
+                  Dark Mode
+                </>
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={handleLogout}
+              className="w-full justify-start text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+            >
+              <FiLogOut className="mr-3 h-5 w-5" />
+              Logout
+            </Button>
+          </div>
         </div>
       )}
     </div>

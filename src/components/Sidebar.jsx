@@ -1,11 +1,11 @@
 "use client";
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { 
   FiHome, FiShoppingCart, FiPieChart, 
   FiUsers, FiSettings, FiSun, FiMoon, 
-  FiShoppingBag, FiLock, FiBarChart2
+  FiShoppingBag, FiLock, FiBarChart2, FiLogOut
 } from 'react-icons/fi';
 import { HiOutlineClipboardList } from 'react-icons/hi';
 import { useTheme } from 'next-themes';
@@ -27,6 +27,7 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [storePlan, setStorePlan] = useState(null);
 
@@ -61,6 +62,22 @@ export default function Sidebar() {
       icon: '🔒',
       position: 'top-right',
     });
+  };
+
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      toast.success('Logged out successfully', {
+        position: 'top-right',
+      });
+      router.push('/login');
+    } catch (error) {
+      toast.error('Failed to logout', {
+        position: 'top-right',
+      });
+      console.error('Logout error:', error);
+    }
   };
 
   return (
@@ -109,11 +126,11 @@ export default function Sidebar() {
             );
           })}
         </div>
-        <div className="px-4 py-4">
+        <div className="px-4 py-4 border-t border-gray-200 dark:border-gray-700">
           <Button
             variant="ghost"
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className="w-full justify-start"
+            className="w-full justify-start mb-2"
           >
             {theme === 'dark' ? (
               <>
@@ -126,6 +143,14 @@ export default function Sidebar() {
                 Dark Mode
               </>
             )}
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={handleLogout}
+            className="w-full justify-start text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+          >
+            <FiLogOut className="mr-3 h-5 w-5" />
+            Logout
           </Button>
         </div>
       </div>
