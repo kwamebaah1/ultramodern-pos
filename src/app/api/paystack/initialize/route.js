@@ -7,7 +7,7 @@ export async function POST(request) {
   const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
   
   try {
-    const { store_id, email, plan, amount } = await request.json();
+    const { store_id, email, plan, amount, metadata, subaccount } = await request.json();
 
     // Create Paystack customer if not exists
     const { data: store, error } = await supabase
@@ -37,16 +37,26 @@ export async function POST(request) {
       if (updateError) throw updateError;
     }
 
+    // Build Paystack transaction payload
+    const transactionPayload = {
+      email,
+      amount: amount,
+      customer: customerCode,
+      metadata: metadata || { store_id, plan },
+      callback_url: metadata?.order_type === 'pos_sale' 
+        ? `${process.env.NEXT_PUBLIC_SITE_URL}/api/paystack/verify-pos`
+        : `${process.env.NEXT_PUBLIC_SITE_URL}/api/paystack/verify`
+    };
+
+    // Add subaccount if provided (for special store routing)
+    if (subaccount) {
+      transactionPayload.subaccount = subaccount;
+    }
+
     // Initialize transaction
     const response = await axios.post(
       'https://api.paystack.co/transaction/initialize',
-      {
-        email,
-        amount: amount,
-        customer: customerCode,
-        metadata: { store_id, plan },
-        callback_url: `${process.env.NEXT_PUBLIC_SITE_URL}/api/paystack/verify`
-      },
+      transactionPayload,
       { headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` } }
     );
 

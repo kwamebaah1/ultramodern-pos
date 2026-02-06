@@ -26,7 +26,132 @@ export default function PosPage() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [taxRate, setTaxRate] = useState(10);
   const [storeId, setStoreId] = useState(null);
+  const [showPaymentConfirmation, setShowPaymentConfirmation] = useState(false);
+  const [paymentDetails, setPaymentDetails] = useState(null);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const router = useRouter();
+
+  // Store ID for special handling
+  const SPECIAL_STORE_ID = 'd2a269fb-f9b3-49c4-90a0-e366c4805577';
+  const isSpecialStore = storeId === SPECIAL_STORE_ID;
+
+  // Handle payment callback from Paystack
+  useEffect(() => {
+    const handlePaymentCallback = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const paymentStatus = params.get('payment');
+      const reference = params.get('reference');
+
+      if (paymentStatus === 'success' && reference) {
+        try {
+          // Get stored cart and order data from sessionStorage
+          const storedCartData = sessionStorage.getItem('pos_cart_data');
+          if (!storedCartData) {
+            toast.error('Cart data not found. Please try again.');
+            router.push('/pos');
+            return;
+          }
+
+          const { cart: cartData, customer: customerData, subtotal: subtotalAmount, tax: taxAmount, total: totalAmount, storeId: storedStoreId } = JSON.parse(storedCartData);
+          
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+
+          if (!user) throw new Error('User not found');
+
+          // Check if order already exists for this reference to prevent duplicates
+          const { data: existingOrder } = await supabase
+            .from('orders')
+            .select('id')
+            .eq('paystack_reference', reference)
+            .single();
+
+          if (existingOrder) {
+            // Order already created, just redirect to order receipt page
+            sessionStorage.removeItem('pos_cart_data');
+            toast.success('Payment already processed!');
+            router.push(`/orders/${existingOrder.id}`);
+            return;
+          }
+
+          // Calculate loyalty points based on actual order total (without fees)
+          const pointsEarned = Math.floor(totalAmount / 10);
+
+          // Update customer loyalty points if applicable
+          if (customerData?.id) {
+            await supabase
+              .from('customers')
+              .update({ loyalty_points: customerData.loyalty_points + pointsEarned })
+              .eq('id', customerData.id);
+          }
+
+          // Create order with the original total (without fees)
+          const { data: order, error: orderError } = await supabase
+            .from('orders')
+            .insert({
+              customer_id: customerData?.id || null,
+              subtotal: subtotalAmount,
+              tax_amount: taxAmount,
+              total: totalAmount, // Store original total, NOT the amount with fees
+              payment_method: 'mobile_money',
+              status: 'completed',
+              loyalty_points_earned: pointsEarned,
+              store_id: storedStoreId,
+              paystack_reference: reference,
+            })
+            .select()
+            .single();
+
+          if (orderError) throw orderError;
+
+          // Add order items
+          const orderItems = cartData.map(item => ({
+            order_id: order.id,
+            product_id: item.id,
+            quantity: item.quantity,
+            unit_price: item.price,
+            total_price: item.price * item.quantity
+          }));
+
+          const { error: itemsError } = await supabase
+            .from('order_items')
+            .insert(orderItems);
+
+          if (itemsError) throw itemsError;
+
+          // Update product stock quantities
+          for (const item of cartData) {
+            await supabase
+              .from('products')
+              .update({ stock_quantity: item.stock_quantity - item.quantity })
+              .eq('id', item.id);
+          }
+
+          // Clear stored data and cart
+          sessionStorage.removeItem('pos_cart_data');
+          setCart([]);
+          
+          toast.success('Payment successful! Order completed.');
+          router.push(`/orders/${order.id}`);
+        } catch (error) {
+          console.error('Payment callback error:', error);
+          toast.error('An error occurred during payment processing.');
+          sessionStorage.removeItem('pos_cart_data');
+          router.push('/pos');
+        }
+      } else if (paymentStatus === 'failed' || paymentStatus === 'error') {
+        toast.error('Payment failed. Please try again.');
+        sessionStorage.removeItem('pos_cart_data');
+        router.push('/pos');
+      }
+
+      // Clear the URL params
+      window.history.replaceState({}, document.title, '/pos');
+    };
+
+    handlePaymentCallback();
+  }, [storeId, router]);
 
   // Fetch store settings including tax rate and currency
   useEffect(() => {
@@ -179,6 +304,24 @@ export default function PosPage() {
   const handleCheckout = async () => {
     if (cart.length === 0) return;
 
+    // For mobile money payment, show confirmation with calculated charges
+    if (paymentMethod === 'mobile_money') {
+      // Paystack fee: 1.5% + 100 naira (converted to cedis as 1 GHS)
+      const paystackFeeFixed = 1; // 100 naira converted to cedis
+      const paystackFee = total * 0.015 + paystackFeeFixed;
+      const platformFee = total * 0.02; // 2% platform fee
+      const finalAmount = total + paystackFee + platformFee;
+
+      setPaymentDetails({
+        originalAmount: total,
+        paystackFee: paystackFee,
+        platformFee: platformFee,
+        finalAmount: finalAmount,
+      });
+      setShowPaymentConfirmation(true);
+      return;
+    }
+
     // Calculate loyalty points (1 point per $10 spent)
     const pointsEarned = Math.floor(total / 10);
 
@@ -246,6 +389,66 @@ export default function PosPage() {
     } catch (error) {
       console.error('Checkout error:', error);
       toast.error('There was an error processing your order. Please try again.');
+    }
+  };
+
+  // Handle confirmed mobile money payment
+  const handleConfirmMobileMoneyPayment = async () => {
+    if (!paymentDetails) return;
+
+    setIsProcessingPayment(true);
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) throw userError;
+
+      // Store cart data in sessionStorage before redirecting to Paystack
+      sessionStorage.setItem('pos_cart_data', JSON.stringify({
+        cart: cart,
+        customer: customer,
+        subtotal: subtotal,
+        tax: tax,
+        total: total, // Store original total WITHOUT fees
+        storeId: storeId,
+        paymentAmount: paymentDetails.finalAmount, // The amount customer actually paid
+      }));
+
+      // Initialize Paystack transaction with the calculated final amount
+      const paystackResponse = await fetch('/api/paystack/initialize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          store_id: storeId,
+          email: customer?.email || user.email,
+          amount: Math.round(paymentDetails.finalAmount * 100), // Convert to smallest currency unit
+          metadata: {
+            order_type: 'pos_sale',
+            original_amount: paymentDetails.originalAmount,
+            paystack_fee: paymentDetails.paystackFee,
+            platform_fee: paymentDetails.platformFee,
+          },
+          subaccount: isSpecialStore ? 'ACCT_rt7jopkz088sumh' : undefined,
+        }),
+      });
+
+      const paystackData = await paystackResponse.json();
+
+      if (paystackData.status) {
+        // Redirect to Paystack payment page
+        window.location.href = paystackData.data.authorization_url;
+      } else {
+        throw new Error(paystackData.message || 'Failed to initialize payment');
+      }
+    } catch (error) {
+      console.error('Payment initialization error:', error);
+      toast.error('Failed to process payment. Please try again.');
+      setShowPaymentConfirmation(false);
+      sessionStorage.removeItem('pos_cart_data');
+    } finally {
+      setIsProcessingPayment(false);
     }
   };
 
@@ -343,7 +546,7 @@ export default function PosPage() {
           
           <div className="mt-4">
             <label className="block text-sm font-medium mb-1">Payment Method</label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className={`grid gap-2 ${isSpecialStore ? 'grid-cols-3' : 'grid-cols-2'}`}>
               <Button
                 variant={paymentMethod === 'cash' ? 'default' : 'outline'}
                 onClick={() => setPaymentMethod('cash')}
@@ -358,6 +561,15 @@ export default function PosPage() {
               >
                 <FiCreditCard /> Card
               </Button>
+              {isSpecialStore && (
+                <Button
+                  variant={paymentMethod === 'mobile_money' ? 'default' : 'outline'}
+                  onClick={() => setPaymentMethod('mobile_money')}
+                  className="flex items-center gap-2 text-xs sm:text-sm"
+                >
+                  <FiCreditCard /> Mobile Money
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -452,6 +664,66 @@ export default function PosPage() {
           className="fixed inset-0 bg-black bg-opacity-50 z-10 md:hidden"
           onClick={() => setIsCartOpen(false)}
         />
+      )}
+
+      {/* Mobile Money Payment Confirmation Modal */}
+      {showPaymentConfirmation && paymentDetails && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-sm w-full p-6 space-y-4">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Payment Confirmation</h2>
+            
+            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600 dark:text-gray-300">Order Amount:</span>
+                <span className="font-medium text-gray-900 dark:text-white">
+                  {formatCurrency(paymentDetails.originalAmount)}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600 dark:text-gray-300">Paystack Fee (1.5% + 100 NGN):</span>
+                <span className="font-medium text-gray-900 dark:text-white">
+                  {formatCurrency(paymentDetails.paystackFee)}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600 dark:text-gray-300">Platform Fee (2%):</span>
+                <span className="font-medium text-gray-900 dark:text-white">
+                  {formatCurrency(paymentDetails.platformFee)}
+                </span>
+              </div>
+              <div className="border-t border-gray-200 dark:border-gray-600 pt-2 flex justify-between">
+                <span className="font-bold text-gray-900 dark:text-white">Total Amount to Pay:</span>
+                <span className="font-bold text-lg text-green-600 dark:text-green-400">
+                  {formatCurrency(paymentDetails.finalAmount)}
+                </span>
+              </div>
+            </div>
+
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              The customer will be prompted to enter their phone number or card details on the next screen.
+            </p>
+
+            <div className="flex gap-2 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowPaymentConfirmation(false);
+                  setPaymentDetails(null);
+                }}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleConfirmMobileMoneyPayment}
+                disabled={isProcessingPayment}
+                className="flex-1 bg-green-600 hover:bg-green-700"
+              >
+                {isProcessingPayment ? 'Processing...' : 'Proceed to Payment'}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
