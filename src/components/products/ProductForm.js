@@ -420,6 +420,19 @@ export function ProductForm({ open, onOpenChange, product, onSubmit }) {
               />
             </div>
 
+            <div className="space-y-2 md:col-span-2">
+              <Label className="text-sm md:text-base">Product Image</Label>
+              <div className="border rounded-lg p-3 md:p-4">
+                <ImageUpload 
+                  onUpload={handleImageUpload}
+                  currentImage={watch('image_url')}
+                />
+              </div>
+              {errors.image_public_id?.message && (
+                <p className="text-sm text-red-500">{errors.image_public_id.message}</p>
+              )}
+            </div>
+
             <div className="flex items-center space-x-2 md:col-span-2 pt-2">
               <input
                 type="checkbox"
