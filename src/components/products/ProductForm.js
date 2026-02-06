@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/Label';
 import { Textarea } from '@/components/ui/Textarea';
 import { ImageUpload } from '@/components/ImageUpload';
 import { useToast } from '@/components/ui/Toast';
+import { FiInfo } from 'react-icons/fi';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -25,11 +26,21 @@ const productSchema = z.object({
   image_url: z.string().optional(),
   image_public_id: z.string().optional(),
   is_active: z.boolean().default(true),
+  batch_number: z.string().optional(),
+  expiry_date: z.string().optional(),
 });
 
 export function ProductForm({ open, onOpenChange, product, onSubmit }) {
   const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [entryMode, setEntryMode] = useState('single'); // 'single' or 'bulk'
+  const [bulkFields, setBulkFields] = useState({
+    numBoxes: 1,
+    unitsPerBox: 1,
+    costPerBox: 0,
+    marginPercent: 30,
+  });
+
   const { register, handleSubmit, formState: { errors }, reset, setValue, watch } = useForm({
     resolver: zodResolver(productSchema),
     defaultValues: product || {
@@ -40,6 +51,8 @@ export function ProductForm({ open, onOpenChange, product, onSubmit }) {
       stock_quantity: 0,
       min_stock_level: 5,
       is_active: true,
+      batch_number: '',
+      expiry_date: '',
     },
   });
 
@@ -65,7 +78,10 @@ export function ProductForm({ open, onOpenChange, product, onSubmit }) {
         image_url: product.image_url || '',
         image_public_id: product.image_public_id || '',
         is_active: product.is_active !== false,
+        batch_number: product.batch_number || '',
+        expiry_date: product.expiry_date || '',
       });
+      setEntryMode('single');
     } else {
       reset({
         name: '',
@@ -75,8 +91,17 @@ export function ProductForm({ open, onOpenChange, product, onSubmit }) {
         stock_quantity: 0,
         min_stock_level: 5,
         is_active: true,
+        batch_number: '',
+        expiry_date: '',
       });
+      setEntryMode('single');
     }
+    setBulkFields({
+      numBoxes: 1,
+      unitsPerBox: 1,
+      costPerBox: 0,
+      marginPercent: 30,
+    });
   }, [product, reset]);
 
   const productName = watch('name');
@@ -91,6 +116,32 @@ export function ProductForm({ open, onOpenChange, product, onSubmit }) {
   const handleImageUpload = (publicId) => {
     setValue('image_public_id', publicId);
     setValue('image_url', `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/${publicId}`);
+  };
+
+  // Calculate bulk fields when any bulk value changes
+  const calculateFromBulk = () => {
+    const { numBoxes, unitsPerBox, costPerBox, marginPercent } = bulkFields;
+    const totalStock = numBoxes * unitsPerBox;
+    const costPerUnit = costPerBox / unitsPerBox;
+    const sellingPrice = costPerUnit * (1 + marginPercent / 100);
+
+    setValue('stock_quantity', totalStock);
+    setValue('cost', Math.round(costPerUnit * 100) / 100);
+    setValue('price', Math.round(sellingPrice * 100) / 100);
+  };
+
+  useEffect(() => {
+    if (entryMode === 'bulk') {
+      calculateFromBulk();
+    }
+  }, [bulkFields, entryMode]);
+
+  const handleBulkFieldChange = (field, value) => {
+    const numValue = parseFloat(value) || 0;
+    setBulkFields(prev => ({
+      ...prev,
+      [field]: numValue
+    }));
   };
 
   const onFormSubmit = async (data) => {
@@ -121,6 +172,43 @@ export function ProductForm({ open, onOpenChange, product, onSubmit }) {
             {product ? 'Edit Product' : 'Add New Product'}
           </DialogTitle>
         </DialogHeader>
+        
+        {/* Entry Mode Toggle */}
+        {!product && (
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 md:p-4 mb-4">
+            <div className="flex items-start space-x-3">
+              <FiInfo className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 space-y-3">
+                <p className="text-sm font-medium text-blue-900 dark:text-blue-100">How are you adding this product?</p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEntryMode('single')}
+                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      entryMode === 'single'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    Individual Item
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEntryMode('bulk')}
+                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      entryMode === 'bulk'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    Box/Bulk Purchase
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
             <div className="space-y-2 md:col-span-2">
@@ -133,43 +221,151 @@ export function ProductForm({ open, onOpenChange, product, onSubmit }) {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="price" className="text-sm md:text-base">Price*</Label>
-              <Input
-                id="price"
-                type="number"
-                step="0.01"
-                min="0"
-                {...register('price', { valueAsNumber: true })}
-                error={errors.price?.message}
-                className="text-sm md:text-base"
-              />
-            </div>
+            {/* Bulk Mode Section */}
+            {entryMode === 'bulk' && (
+              <div className="md:col-span-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 md:p-4 space-y-3">
+                <h3 className="font-medium text-amber-900 dark:text-amber-100">Bulk Purchase Details</h3>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="numBoxes" className="text-sm">Number of Boxes</Label>
+                    <Input
+                      id="numBoxes"
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={bulkFields.numBoxes}
+                      onChange={(e) => handleBulkFieldChange('numBoxes', e.target.value)}
+                      className="text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="unitsPerBox" className="text-sm">Units Per Box</Label>
+                    <Input
+                      id="unitsPerBox"
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={bulkFields.unitsPerBox}
+                      onChange={(e) => handleBulkFieldChange('unitsPerBox', e.target.value)}
+                      className="text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="costPerBox" className="text-sm">Cost Per Box</Label>
+                    <Input
+                      id="costPerBox"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={bulkFields.costPerBox}
+                      onChange={(e) => handleBulkFieldChange('costPerBox', e.target.value)}
+                      className="text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="marginPercent" className="text-sm">Profit Margin %</Label>
+                    <Input
+                      id="marginPercent"
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={bulkFields.marginPercent}
+                      onChange={(e) => handleBulkFieldChange('marginPercent', e.target.value)}
+                      className="text-sm"
+                    />
+                  </div>
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="cost" className="text-sm md:text-base">Cost</Label>
-              <Input
-                id="cost"
-                type="number"
-                step="0.01"
-                min="0"
-                {...register('cost', { valueAsNumber: true })}
-                error={errors.cost?.message}
-                className="text-sm md:text-base"
-              />
-            </div>
+                {/* Bulk Breakdown */}
+                <div className="bg-white dark:bg-gray-800 rounded p-2 md:p-3 space-y-2 mt-3">
+                  <div className="text-xs md:text-sm text-gray-600 dark:text-gray-400 font-medium">Calculated Values:</div>
+                  <div className="grid grid-cols-2 gap-2 text-xs md:text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Total Stock:</span>
+                      <span className="font-semibold text-gray-900 dark:text-white">{bulkFields.numBoxes * bulkFields.unitsPerBox} units</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Cost/Unit:</span>
+                      <span className="font-semibold text-gray-900 dark:text-white">{(bulkFields.costPerBox / bulkFields.unitsPerBox).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Selling Price/Unit:</span>
+                      <span className="font-semibold text-green-600 dark:text-green-400">{(bulkFields.costPerBox / bulkFields.unitsPerBox * (1 + bulkFields.marginPercent / 100)).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Total Profit:</span>
+                      <span className="font-semibold text-green-600 dark:text-green-400">{((bulkFields.costPerBox / bulkFields.unitsPerBox * (1 + bulkFields.marginPercent / 100)) * bulkFields.numBoxes * bulkFields.unitsPerBox - bulkFields.costPerBox * bulkFields.numBoxes).toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="stock_quantity" className="text-sm md:text-base">Stock Quantity*</Label>
-              <Input
-                id="stock_quantity"
-                type="number"
-                min="0"
-                {...register('stock_quantity', { valueAsNumber: true })}
-                error={errors.stock_quantity?.message}
-                className="text-sm md:text-base"
-              />
-            </div>
+                {/* Batch and Expiry Info */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-amber-200 dark:border-amber-800">
+                  <div className="space-y-2">
+                    <Label htmlFor="batch_number" className="text-sm">Batch Number</Label>
+                    <Input
+                      id="batch_number"
+                      {...register('batch_number')}
+                      placeholder="e.g., BATCH-001"
+                      className="text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="expiry_date" className="text-sm">Expiry Date</Label>
+                    <Input
+                      id="expiry_date"
+                      type="date"
+                      {...register('expiry_date')}
+                      className="text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Single Mode Section */}
+            {entryMode === 'single' && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="price" className="text-sm md:text-base">Price*</Label>
+                  <Input
+                    id="price"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    {...register('price', { valueAsNumber: true })}
+                    error={errors.price?.message}
+                    className="text-sm md:text-base"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="cost" className="text-sm md:text-base">Cost</Label>
+                  <Input
+                    id="cost"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    {...register('cost', { valueAsNumber: true })}
+                    error={errors.cost?.message}
+                    className="text-sm md:text-base"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="stock_quantity" className="text-sm md:text-base">Stock Quantity*</Label>
+                  <Input
+                    id="stock_quantity"
+                    type="number"
+                    min="0"
+                    {...register('stock_quantity', { valueAsNumber: true })}
+                    error={errors.stock_quantity?.message}
+                    className="text-sm md:text-base"
+                  />
+                </div>
+              </>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="min_stock_level" className="text-sm md:text-base">Minimum Stock Level</Label>
@@ -222,19 +418,6 @@ export function ProductForm({ open, onOpenChange, product, onSubmit }) {
                 rows={3}
                 className="text-sm md:text-base min-h-[80px]"
               />
-            </div>
-
-            <div className="space-y-2 md:col-span-2">
-              <Label className="text-sm md:text-base">Product Image</Label>
-              <div className="border rounded-lg p-3 md:p-4">
-                <ImageUpload 
-                  onUpload={handleImageUpload}
-                  currentImage={watch('image_url')}
-                />
-              </div>
-              {errors.image_public_id?.message && (
-                <p className="text-sm text-red-500">{errors.image_public_id.message}</p>
-              )}
             </div>
 
             <div className="flex items-center space-x-2 md:col-span-2 pt-2">
