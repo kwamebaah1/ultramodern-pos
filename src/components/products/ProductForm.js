@@ -30,16 +30,24 @@ const productSchema = z.object({
   expiry_date: z.string().optional(),
 });
 
-export function ProductForm({ open, onOpenChange, product, onSubmit }) {
+export function ProductForm({ open, onOpenChange, product, onSubmit, categories = [] }) {
   const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [entryMode, setEntryMode] = useState('single'); // 'single' or 'bulk'
+  const [categoryInput, setCategoryInput] = useState('');
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
   const [bulkFields, setBulkFields] = useState({
     numBoxes: 1,
     unitsPerBox: 1,
     costPerBox: 0,
     marginPercent: 30,
   });
+
+  // Filter categories based on input
+  const filteredCategories = categories.filter(cat =>
+    cat.toLowerCase().includes(categoryInput.toLowerCase())
+  );
+  const hasExactMatch = filteredCategories.some(cat => cat.toLowerCase() === categoryInput.toLowerCase());
 
   const { register, handleSubmit, formState: { errors }, reset, setValue, watch } = useForm({
     resolver: zodResolver(productSchema),
@@ -81,6 +89,7 @@ export function ProductForm({ open, onOpenChange, product, onSubmit }) {
         batch_number: product.batch_number || '',
         expiry_date: product.expiry_date || '',
       });
+      setCategoryInput(product.category || '');
       setEntryMode('single');
     } else {
       reset({
@@ -94,6 +103,7 @@ export function ProductForm({ open, onOpenChange, product, onSubmit }) {
         batch_number: '',
         expiry_date: '',
       });
+      setCategoryInput('');
       setEntryMode('single');
     }
     setBulkFields({
@@ -145,6 +155,11 @@ export function ProductForm({ open, onOpenChange, product, onSubmit }) {
   };
 
   const onFormSubmit = async (data) => {
+    // Ensure category is set from categoryInput if not already set
+    if (categoryInput && !data.category) {
+      data.category = categoryInput;
+    }
+    
     setIsLoading(true);
     try {
       if (product) {
@@ -153,6 +168,7 @@ export function ProductForm({ open, onOpenChange, product, onSubmit }) {
         await onSubmit(data);
       }
       reset();
+      setCategoryInput('');
     } catch (error) {
       showToast({
         title: 'Error',
@@ -401,12 +417,69 @@ export function ProductForm({ open, onOpenChange, product, onSubmit }) {
 
             <div className="space-y-2">
               <Label htmlFor="category" className="text-sm md:text-base">Category</Label>
-              <Input
-                id="category"
-                {...register('category')}
-                error={errors.category?.message}
-                className="text-sm md:text-base"
-              />
+              <div className="relative">
+                <Input
+                  id="category"
+                  type="text"
+                  placeholder="Search or add category..."
+                  value={categoryInput}
+                  onChange={(e) => {
+                    setCategoryInput(e.target.value);
+                    setCategoryDropdownOpen(true);
+                  }}
+                  onFocus={() => setCategoryDropdownOpen(true)}
+                  className="text-sm md:text-base"
+                />
+                {categoryDropdownOpen && categoryInput && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
+                    {filteredCategories.length > 0 ? (
+                      <div className="py-1">
+                        {filteredCategories.map((cat) => (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => {
+                              setCategoryInput(cat);
+                              setValue('category', cat);
+                              setCategoryDropdownOpen(false);
+                            }}
+                            className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors flex items-center"
+                          >
+                            <span className="text-gray-700 dark:text-gray-300">{cat}</span>
+                          </button>
+                        ))}
+                        {!hasExactMatch && (
+                          <div className="border-t border-gray-200 dark:border-gray-700 pt-1 mt-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setValue('category', categoryInput);
+                                setCategoryDropdownOpen(false);
+                              }}
+                              className="w-full px-3 py-2 text-left text-sm hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors flex items-center gap-2"
+                            >
+                              <span className="text-sm">+</span>
+                              <span className="text-green-600 dark:text-green-400 font-medium">Create new: "{categoryInput}"</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ) : categoryInput ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setValue('category', categoryInput);
+                          setCategoryDropdownOpen(false);
+                        }}
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors flex items-center gap-2"
+                      >
+                        <span className="text-sm">+</span>
+                        <span className="text-green-600 dark:text-green-400 font-medium">Create new: "{categoryInput}"</span>
+                      </button>
+                    ) : null}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2 md:col-span-2">

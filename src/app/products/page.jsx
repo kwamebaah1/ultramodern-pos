@@ -278,6 +278,7 @@ export default function ProductsPage() {
         product={currentProduct}
         onSubmit={currentProduct ? handleUpdate : handleCreate}
         storeId={storeId}
+        categories={categories}
       />
     </div>
   );
