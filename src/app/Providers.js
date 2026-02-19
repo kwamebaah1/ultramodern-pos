@@ -7,7 +7,7 @@ import { ThemeProvider } from '@/components/ThemeProvider';
 import { usePathname } from 'next/navigation';
 import { Toaster } from "react-hot-toast";
 
-const SIDEBAR_EXCLUDED_ROUTES = ['/login', '/signup', '/forgot-password', '/reset-password'];
+const SIDEBAR_EXCLUDED_ROUTES = ['/login', '/signup', '/forgot-password', '/reset-password', '/change-password'];
 
 export function Providers({ children }) {
   const pathname = usePathname();

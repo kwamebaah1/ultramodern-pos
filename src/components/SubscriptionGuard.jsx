@@ -9,19 +9,26 @@ export default function SubscriptionGuard({ children }) {
   const pathname = usePathname();
 
   useEffect(() => {
-    // Skip check for auth and subscription pages
-    if (pathname.startsWith('/login') || 
-        pathname.startsWith('/signup') || 
-        pathname.startsWith('/subscribe')) {
+    // Skip check for auth and special pages
+    if (pathname.startsWith('/login') ||
+        pathname.startsWith('/signup') ||
+        pathname.startsWith('/subscribe') ||
+        pathname.startsWith('/change-password')) {
       return;
     }
 
     const checkSubscription = async () => {
       // Get the user's session
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (!user) {
         router.push('/login');
+        return;
+      }
+
+      // Enforce first-login password change even if session already exists
+      if (user.user_metadata?.must_change_password) {
+        router.push('/change-password');
         return;
       }
 

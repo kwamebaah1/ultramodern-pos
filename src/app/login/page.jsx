@@ -35,6 +35,12 @@ export default function Login() {
 
       if (authError) throw authError;
 
+      // If this is a first-login account, force password change before anything else
+      if (authData.user.user_metadata?.must_change_password) {
+        router.push('/change-password');
+        return;
+      }
+
       const { data: userStores, error: userError } = await supabase
         .from('users')
         .select('store_id, stores(slug)')
